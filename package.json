@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --env-file-if-exists=.env server.js"
+    "dev": "node --env-file-if-exists=.env server.js",
+    "revisar": "node revisar.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "latest",
