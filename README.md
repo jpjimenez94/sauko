@@ -45,7 +45,17 @@ Sin `ANTHROPIC_API_KEY` la página y el panel funcionan, pero el chat avisa que 
 3. En Settings → Environment Variables, agregar `ANTHROPIC_API_KEY` y `PANEL_PIN`.
 4. Desplegar y conectar el dominio.
 
-## Conectar WhatsApp (Meta)
+## Conectar WhatsApp por YCloud
+
+Es el camino elegido: el número de la tienda sigue funcionando en su app WhatsApp Business.
+
+1. Crear la cuenta en ycloud.com y conectar el número con la opción de WhatsApp Business App (coexistencia).
+2. En Developers → API Keys, crear la clave. En Developers → Webhook, agregar `https://<dominio>/api/ycloud` con el evento `whatsapp.inbound_message.received` y copiar el secreto.
+3. En Vercel, agregar `YCLOUD_API_KEY`, `YCLOUD_FROM` (el número con +57) y `YCLOUD_WEBHOOK_SECRET`, y volver a desplegar.
+
+Pendiente: cuando el dueño responde a mano desde el celular, el asistente no se entera y puede contestar también.
+
+## Conectar WhatsApp directo con Meta (alternativa)
 
 1. En developers.facebook.com, crear una app de tipo Business y agregar el producto WhatsApp. Meta da un número de prueba que puede escribirle a los teléfonos que se registren ahí.
 2. En Vercel, agregar `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET` (App Secret de la app) y `WHATSAPP_VERIFY_TOKEN` (una palabra inventada), y volver a desplegar.

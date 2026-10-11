@@ -1,41 +1,9 @@
 import { waitUntil } from "@vercel/functions";
-import { atenderWhatsApp } from "../lib/conversacion.js";
-import { enviarTexto, bajarImagen, firmaValida } from "../lib/whatsapp.js";
-import { esNuevo } from "../lib/store.js";
-import { hayClave } from "../lib/agente.js";
+import { bajarImagen, firmaValida } from "../lib/whatsapp.js";
+import { atenderEntrante, cuerpoCrudo } from "../lib/entrada.js";
 
-// Webhook de WhatsApp Cloud API (Meta).
+// Webhook de WhatsApp Cloud API (Meta directo).
 // Variables: WHATSAPP_VERIFY_TOKEN, WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_APP_SECRET.
-
-/** El cuerpo tal como llegó, para comprobar la firma. */
-async function cuerpoCrudo(req) {
-  if (typeof req.rawBody === "string") return req.rawBody; // servidor local
-  if (!req.readableEnded) {
-    const trozos = [];
-    for await (const trozo of req) trozos.push(trozo);
-    if (trozos.length) return Buffer.concat(trozos).toString("utf8");
-  }
-  return JSON.stringify(req.body ?? {});
-}
-
-async function atender(mensaje) {
-  const telefono = mensaje.from;
-  try {
-    if (!(await esNuevo(mensaje.id))) return;
-    if (!hayClave()) return void (await enviarTexto(telefono, "En este momento el asistente no está disponible. Escríbenos de nuevo en un rato."));
-    if (mensaje.type === "text") return void (await enviarTexto(telefono, await atenderWhatsApp(telefono, mensaje.text?.body ?? "")));
-    if (mensaje.type === "image") {
-      const imagen = await bajarImagen(mensaje.image?.id);
-      if (!imagen) return void (await enviarTexto(telefono, "No pude abrir esa foto, veci. ¿Me la mandás otra vez?"));
-      return void (await enviarTexto(telefono, await atenderWhatsApp(telefono, mensaje.image?.caption ?? "", imagen)));
-    }
-    await enviarTexto(telefono, "Por acá solo leo texto y fotos, veci. Escribime qué necesitás y te lo armo.");
-  } catch (error) {
-    console.error("whatsapp:", error);
-    await enviarTexto(telefono, "Se nos enredó algo por acá. Escribime de nuevo en un momento, porfa.").catch(() => {});
-  }
-}
-
 export default async function handler(req, res) {
   if (req.method === "GET") {
     const { "hub.mode": modo, "hub.verify_token": token, "hub.challenge": reto } = req.query ?? {};
@@ -55,7 +23,11 @@ export default async function handler(req, res) {
 
   // Meta espera el 200 en pocos segundos; el asistente sigue trabajando después de responder.
   const mensajes = (cuerpo.entry ?? []).flatMap((e) => e.changes ?? []).flatMap((c) => c.value?.messages ?? []);
-  const trabajo = Promise.all(mensajes.map(atender));
+  const trabajo = Promise.all(
+    mensajes.map((m) =>
+      atenderEntrante({ id: m.id, telefono: m.from, tipo: m.type, texto: m.text?.body ?? m.image?.caption ?? "", bajar: () => bajarImagen(m.image?.id) }),
+    ),
+  );
   waitUntil(trabajo);
   res.status(200).send("ok");
   await trabajo.catch(() => {});
