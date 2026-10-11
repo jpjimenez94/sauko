@@ -39,6 +39,8 @@ export default async function handler(req, res) {
     console.error("chat:", error);
     if (error instanceof Anthropic.RateLimitError) return res.status(429).json({ error: "El asistente está muy ocupado. Intenta en un momento." });
     if (error instanceof Anthropic.AuthenticationError) return res.status(503).json({ error: "La clave de IA del servidor no es válida." });
-    return res.status(502).json({ error: "El asistente no pudo responder. Intenta de nuevo." });
+    // El motivo técnico ayuda a diagnosticar la configuración; no incluye la clave.
+    const motivo = error instanceof Anthropic.APIError ? `${error.status} ${error.error?.error?.type ?? ""}: ${String(error.error?.error?.message ?? error.message).slice(0, 200)}` : String(error?.message ?? error).slice(0, 200);
+    return res.status(502).json({ error: "El asistente no pudo responder. Intenta de nuevo.", motivo });
   }
 }
