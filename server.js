@@ -23,6 +23,7 @@ const rutas = {
   "/api/orders": () => import("./api/orders.js"),
   "/api/agotados": () => import("./api/agotados.js"),
   "/api/estanteria": () => import("./api/estanteria.js"),
+  "/api/whatsapp": () => import("./api/whatsapp.js"),
 };
 
 function leerCuerpo(req) {
@@ -30,6 +31,7 @@ function leerCuerpo(req) {
     let datos = "";
     req.on("data", (trozo) => (datos += trozo));
     req.on("end", () => {
+      req.rawBody = datos;
       try {
         resolve(datos ? JSON.parse(datos) : {});
       } catch {
@@ -47,6 +49,7 @@ createServer(async (req, res) => {
     req.body = ["POST", "PATCH"].includes(req.method) ? await leerCuerpo(req) : {};
     res.status = (codigo) => ((res.statusCode = codigo), res);
     res.json = (objeto) => (res.setHeader("Content-Type", TIPOS[".json"]), res.end(JSON.stringify(objeto)));
+    res.send = (texto) => res.end(String(texto ?? ""));
     const { default: handler } = await rutas[url.pathname]();
     return handler(req, res);
   }

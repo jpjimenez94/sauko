@@ -1007,7 +1007,7 @@ $('pin-form').onsubmit = e => { e.preventDefault(); PIN = $('pin').value.trim();
 function act(o, patch) { store.patch(o.id, patch).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); }
 function tarjeta(o) {
   const el = h('article', { class: 'tarjeta' }), items = Array.isArray(o.items) ? o.items : [];
-  el.append(h('div', { class: 'tarjeta__cabeza' }, h('strong', { class: 'n num' }, '#' + o.no), h('small', { class: 'num' }, new Date(o.hora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) + ' · ' + String(o.canal || 'Web'))));
+  el.append(h('div', { class: 'tarjeta__cabeza' }, h('strong', { class: 'n num' }, '#' + o.no), h('small', { class: 'num' }, new Date(o.hora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) + ' · ' + String(o.canal || 'Web') + (o.cliente ? ' +' + String(o.cliente) : ''))));
   el.append(h('p', null, h('b', null, 'Entrega: '), String(o.direccion || '')));
   const picking = o.status === 'alistando', set = picked.get(o.id) || new Set();
   el.append(h('ul', null, ...items.map((i, k) => { const p = BY_SKU.get(i.sku);

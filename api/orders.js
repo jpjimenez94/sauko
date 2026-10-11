@@ -1,5 +1,7 @@
 import { CATALOGO, COSTO_DOMICILIO, DOMICILIO_GRATIS_DESDE, exigirPin } from "../lib/comun.js";
 import { listarPedidos, leerPedido, guardarPedido, borrarPedido } from "../lib/store.js";
+import { avisoDeTienda } from "../lib/conversacion.js";
+import { enviarTexto } from "../lib/whatsapp.js";
 
 // Estados que puede poner la página del cliente y estados que solo mueve el panel.
 const DEL_CLIENTE = ["armando", "esperando_pago", "por_confirmar"];
@@ -45,7 +47,7 @@ export default async function handler(req, res) {
       // Con id: el cliente consulta su propio pedido. Sin id: la lista completa, solo para el panel.
       if (req.query?.id) {
         const pedido = await leerPedido(texto(req.query.id, 40));
-        return pedido ? res.status(200).json({ pedido: { ...pedido, proof: "" } }) : res.status(404).json({ error: "No existe" });
+        return pedido ? res.status(200).json({ pedido: { ...pedido, proof: "", cliente: undefined } }) : res.status(404).json({ error: "No existe" });
       }
       if (!exigirPin(req, res)) return;
       return res.status(200).json({ pedidos: await listarPedidos() });
@@ -69,6 +71,9 @@ export default async function handler(req, res) {
       pedido.status = estado;
       if (estado === "esperando_pago") Object.assign(pedido, { rechazo: Date.now(), proof: "", proofMonto: 0 });
       await guardarPedido(pedido);
+      // Si el pedido llegó por WhatsApp, el aviso le sale al cliente por ese mismo chat.
+      const aviso = await avisoDeTienda(pedido);
+      if (aviso) await enviarTexto(pedido.cliente, aviso);
       return res.status(200).json({ ok: true });
     }
 

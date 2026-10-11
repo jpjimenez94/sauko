@@ -33,6 +33,9 @@ Sin `ANTHROPIC_API_KEY` la página y el panel funcionan, pero el chat avisa que 
 | `api/orders.js` | Pedidos. Recalcula nombres, precios y total con el catálogo antes de guardar. |
 | `api/agotados.js` | Productos marcados como agotados desde el panel. |
 | `api/estanteria.js` | Control de estantería: reconoce productos en una foto. |
+| `api/whatsapp.js` | Webhook de WhatsApp Cloud API (Meta): recibe texto y fotos, valida la firma y responde. |
+| `lib/conversacion.js` | El asistente por WhatsApp: ejecuta las herramientas en el servidor y guarda la conversación de cada teléfono. |
+| `lib/tienda.js`, `lib/whatsapp.js` | Búsqueda en el catálogo y pedido en el servidor; envío de mensajes y descarga de fotos de Meta. |
 | `server.js` | Servidor local. En Vercel no se usa. |
 
 ## Desplegar en Vercel
@@ -42,10 +45,19 @@ Sin `ANTHROPIC_API_KEY` la página y el panel funcionan, pero el chat avisa que 
 3. En Settings → Environment Variables, agregar `ANTHROPIC_API_KEY` y `PANEL_PIN`.
 4. Desplegar y conectar el dominio.
 
+## Conectar WhatsApp (Meta)
+
+1. En developers.facebook.com, crear una app de tipo Business y agregar el producto WhatsApp. Meta da un número de prueba que puede escribirle a los teléfonos que se registren ahí.
+2. En Vercel, agregar `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET` (App Secret de la app) y `WHATSAPP_VERIFY_TOKEN` (una palabra inventada), y volver a desplegar.
+3. En la app de Meta, WhatsApp → Configuration → Webhook: URL `https://<dominio>/api/whatsapp`, el mismo verify token, y suscribir el campo `messages`.
+4. Escribirle al número de prueba desde un teléfono registrado.
+
+El token temporal de Meta vence en 24 horas; para dejarlo fijo se crea un usuario del sistema en Meta Business y se genera un token permanente. Sin la base Redis las conversaciones de WhatsApp se pierden entre mensajes.
+
 ## Lo que falta para operar de verdad
 
 - **Inventario real.** Las existencias son simuladas en el navegador. Falta conectar Siigo.
-- **WhatsApp.** El asistente solo atiende en la página; falta el canal de WhatsApp.
+- **WhatsApp.** El canal está construido pero sin probar con Meta: falta la app, el número real y la verificación del negocio. Por WhatsApp no hay existencias: solo se excluye lo marcado como agotado en el panel.
 - **Pago.** El asistente lee el comprobante y la tienda lo confirma a mano. No hay verificación contra Nequi ni el banco.
 - **Costo de domicilio y cobertura.** Los $2.000 por debajo de $20.000 son un valor de ejemplo.
 - **Categorías.** Los productos que estaban en "Otros" se clasificaron automáticamente por nombre; conviene revisarlos.
