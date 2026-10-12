@@ -8,7 +8,6 @@
     "revisar": "node revisar.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "latest",
-    "@vercel/functions": "latest"
+    "@anthropic-ai/sdk": "latest"
   }
 }

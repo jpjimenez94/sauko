@@ -1,4 +1,3 @@
-import { waitUntil } from "@vercel/functions";
 import { bajarImagen, firmaValida } from "../lib/whatsapp.js";
 import { atenderEntrante, cuerpoCrudo } from "../lib/entrada.js";
 
@@ -21,14 +20,14 @@ export default async function handler(req, res) {
     return res.status(400).send("Cuerpo inválido");
   }
 
-  // Meta espera el 200 en pocos segundos; el asistente sigue trabajando después de responder.
   const mensajes = (cuerpo.entry ?? []).flatMap((e) => e.changes ?? []).flatMap((c) => c.value?.messages ?? []);
   const trabajo = Promise.all(
     mensajes.map((m) =>
       atenderEntrante({ id: m.id, telefono: m.from, tipo: m.type, texto: m.text?.body ?? m.image?.caption ?? "", bajar: () => bajarImagen(m.image?.id) }),
     ),
   );
-  waitUntil(trabajo);
-  res.status(200).send("ok");
+  // Se responde cuando el asistente termina: si se contesta antes, Vercel corta el trabajo a medias.
+  // Si el proveedor reintenta por la demora, el mensaje repetido se descarta.
   await trabajo.catch(() => {});
+  res.status(200).send("ok");
 }
