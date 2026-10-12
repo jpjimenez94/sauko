@@ -837,7 +837,7 @@ function armarTienda() {
   // Inicio: lo más pedido, en el recorrido horizontal.
   const pista = $('pasillos-pista'); pista.querySelectorAll('.pasillo').forEach(n => n.remove());
   for (const consulta of FAVORITOS) { const p = search(consulta, 1)[0]; if (!p) continue;
-    const b = h('button', { class: 'btn btn--dark', type: 'button' }, 'Agregar'); b.onclick = () => { sumar(p); $('pedido-caja').open = true; abrirChat(); };
+    const b = h('button', { class: 'btn btn--dark', type: 'button' }, 'Agregar'); b.onclick = () => { sumar(p); $('pedido-caja').open = true; if (!esCelular()) abrirChat(); };
     const foto = h('div', { class: 'pasillo__foto', 'data-arte': ARTE_CAT[p.type] || 'canasta' }); ponerFoto(foto, p);
     pista.append(h('article', { class: 'pasillo' }, foto, h('small', null, p.type), h('h3', null, p.name), h('div', { class: 'pasillo__pie' }, h('span', { class: 'precio num' }, pesos(p.price)), b))); }
   pintarArte(pista);
@@ -968,7 +968,17 @@ const chat = $('chat'), mensajes = $('chat-mensajes');
 function bubble(tipo, text, img) { const el = h('div', { class: 'msg msg--' + tipo }); if (img) el.append(h('img', { src: URL.createObjectURL(img), alt: 'Imagen enviada' })); el.append(text || ''); mensajes.append(el); mensajes.scrollTop = mensajes.scrollHeight; return el; }
 function setPending(file) { pendingImg = file; $('chat-adjunto').hidden = !file; $('chat-adjunto').textContent = file ? 'Foto lista para enviar: ' + file.name : ''; if (!file) $('foto').value = ''; }
 function agentGone() { sample = null; if (!mensajes.querySelector('.msg--error')) bubble('error', SIN_AGENTE); }
+// En celular el pedido se hace por el WhatsApp de la tienda: se abre con el mensaje ya escrito,
+// incluyendo lo que el cliente haya agregado con los botones.
+const WHATSAPP_TIENDA = '573124529879';
+const esCelular = () => /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
+function mensajeParaWhatsApp(mensaje) {
+  const lineas = CLOSED.includes(order.status) ? [] : order.items.map(i => i.qty + ' x ' + BY_SKU.get(i.sku).name);
+  return lineas.length ? 'Hola, quiero pedir:\n' + lineas.join('\n') : (mensaje || 'Hola, quiero hacer un pedido');
+}
+function abrirWhatsApp(mensaje) { location.href = 'https://wa.me/' + WHATSAPP_TIENDA + '?text=' + encodeURIComponent(mensajeParaWhatsApp(mensaje)); }
 function abrirChat(mensaje) {
+  if (esCelular()) return abrirWhatsApp(mensaje);
   chat.classList.add('is-abierto'); chat.setAttribute('aria-hidden', 'false'); $('burbuja').classList.add('is-oculta');
   if (!mensajes.childElementCount) { bubble('bot', '¡Quiubo, veci! Bienvenido a Sauko. ¿Qué te hace falta hoy?'); if (agenteListo && !sample) agentGone(); }
   if (mensaje && !busy) enviar(mensaje);
