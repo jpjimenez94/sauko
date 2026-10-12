@@ -38,6 +38,7 @@ export default async function handler(req, res) {
   const trabajo = atenderEntrante({
     id: m.wamid || m.id,
     telefono: remitente,
+    usuario: m.customerProfile?.username,
     tipo: m.type,
     texto: m.text?.body ?? m.image?.caption ?? "",
     bajar: () => bajarImagenYCloud(m.image),
