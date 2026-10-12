@@ -8,7 +8,9 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       const base = { ...(await leerAjustes()), whatsappConectado: hayWhatsApp() };
-      return res.status(200).json(req.query?.bitacora ? { ...base, bitacora: await leerBitacora() } : base);
+      if (!req.query?.bitacora) return res.status(200).json(base);
+      // Para diagnosticar: la lista de prueba tal como la ve el servidor y los últimos pasos del canal.
+      return res.status(200).json({ ...base, listaDePrueba: process.env.WHATSAPP_SOLO_NUMEROS ?? null, bitacora: await leerBitacora() });
     }
     if (req.method === "POST") {
       const ajustes = await guardarAjustes({ ...(await leerAjustes()), whatsappActivo: req.body?.whatsappActivo === true });
