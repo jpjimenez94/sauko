@@ -284,6 +284,8 @@ input { font: inherit; color: inherit; }
 .acceso-pin h2 { font-family: var(--display); font-weight: 800; color: var(--morado-oscuro); font-size: 1.5rem; line-height: 1; }
 .panel.bloqueado .acceso-pin { display: grid; }
 .panel.bloqueado .pestanas, .panel.bloqueado main { display: none; }
+.interruptor { padding: 0.55rem 1rem; border-radius: 999px; font-weight: 700; border: 2px solid var(--lila); color: var(--crema); white-space: nowrap; }
+.interruptor[aria-pressed="true"] { background: var(--verde-wa); border-color: var(--verde-wa); color: #fff; }
 .pestanas { display: flex; gap: 0.4rem; padding: 0.6rem clamp(1rem, 4vw, 2rem); background: #fff; border-bottom: 1px solid rgba(0, 0, 0, 0.08); overflow-x: auto; }
 .pestanas button { padding: 0.5rem 1rem; border-radius: 999px; font-weight: 700; white-space: nowrap; color: var(--morado-oscuro); }
 .pestanas button[aria-selected="true"] { background: var(--morado-oscuro); color: var(--crema); }
@@ -510,6 +512,7 @@ input { font: inherit; color: inherit; }
     <span class="logo"><img src="logo.png" alt="" width="46" height="46"></span>
     <h1>Panel de la tienda</h1>
     <span class="vivo"><i></i><span id="vivo-texto">En vivo</span></span>
+    <button class="interruptor" id="wa-interruptor" type="button" aria-pressed="false" hidden>WhatsApp: apagado</button>
     <button class="btn btn--sol" type="button" data-vista="tienda">Volver a la página</button>
   </header>
   <form class="acceso-pin" id="pin-form">
@@ -1002,7 +1005,10 @@ document.querySelectorAll('[data-abrir-chat]').forEach(b => b.addEventListener('
 const COLS = [['por_confirmar', 'Pago por confirmar', 'Cuando un cliente envía su comprobante, el pedido aparece aquí.'], ['alistando', 'Alistando', 'Sin pedidos por alistar.'], ['en_camino', 'En camino', 'Ningún domicilio en la calle.']];
 const VENDIDO = ['alistando', 'en_camino', 'entregado'];
 let panelOrders = [], picked = new Map(), store = null, panelAbierto = false;
-function panelListo(ok, mensaje) { panelAbierto = ok; $('panel').classList.toggle('bloqueado', !ok); if (!ok && mensaje && PIN) $('pin-error').textContent = mensaje; if (ok) { $('pin-error').textContent = ''; $('vivo-texto').textContent = 'En vivo'; } }
+function panelListo(ok, mensaje) { panelAbierto = ok; $('panel').classList.toggle('bloqueado', !ok); if (!ok && mensaje && PIN) $('pin-error').textContent = mensaje; if (ok) { $('pin-error').textContent = ''; $('vivo-texto').textContent = 'En vivo'; if ($('wa-interruptor').hidden) pedir('/api/ajustes').then(pintarWhatsApp).catch(() => {}); } }
+// Interruptor del asistente de WhatsApp: la tienda lo enciende y lo apaga cuando quiera.
+function pintarWhatsApp(a) { const b = $('wa-interruptor'); b.hidden = false; b.setAttribute('aria-pressed', String(!!a.whatsappActivo)); b.textContent = !a.whatsappConectado ? 'WhatsApp: sin conectar' : a.whatsappActivo ? 'WhatsApp: encendido' : 'WhatsApp: apagado'; b.disabled = !a.whatsappConectado; }
+$('wa-interruptor').onclick = () => { const encender = $('wa-interruptor').getAttribute('aria-pressed') !== 'true'; pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ whatsappActivo: encender }) }).then(pintarWhatsApp).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); };
 $('pin-form').onsubmit = e => { e.preventDefault(); PIN = $('pin').value.trim(); try { sessionStorage.setItem('sauko-pin', PIN); } catch (err) {} $('pin').value = ''; store.traerPedidos(); };
 function act(o, patch) { store.patch(o.id, patch).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); }
 function tarjeta(o) {

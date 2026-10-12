@@ -25,6 +25,7 @@ const rutas = {
   "/api/estanteria": () => import("./api/estanteria.js"),
   "/api/whatsapp": () => import("./api/whatsapp.js"),
   "/api/ycloud": () => import("./api/ycloud.js"),
+  "/api/ajustes": () => import("./api/ajustes.js"),
 };
 
 function leerCuerpo(req) {

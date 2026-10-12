@@ -53,6 +53,8 @@ Es el camino elegido: el número de la tienda sigue funcionando en su app WhatsA
 2. En Developers → API Keys, crear la clave. En Developers → Webhook, agregar `https://<dominio>/api/ycloud` con el evento `whatsapp.inbound_message.received` y copiar el secreto.
 3. En Vercel, agregar `YCLOUD_API_KEY`, `YCLOUD_FROM` (el número con +57) y `YCLOUD_WEBHOOK_SECRET`, y volver a desplegar.
 
+El asistente de WhatsApp arranca **apagado**: se enciende y se apaga con el botón "WhatsApp" del panel, al instante. Con `WHATSAPP_SOLO_NUMEROS` además se limita a ciertos teléfonos para una prueba piloto.
+
 Pendiente: cuando el dueño responde a mano desde el celular, el asistente no se entera y puede contestar también.
 
 ## Conectar WhatsApp directo con Meta (alternativa)
