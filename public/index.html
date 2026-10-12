@@ -243,6 +243,21 @@ input { font: inherit; color: inherit; }
 .chat__form .redondo svg { width: 21px; height: 21px; }
 .chat__form button:disabled { opacity: 0.5; cursor: default; }
 
+/* Elegir canal: WhatsApp o el chat de la página (solo en computador) */
+.elegir { margin: auto; border: 0; border-radius: 1.6rem; padding: 2rem; width: min(520px, calc(100vw - 2rem)); background: var(--crema); color: var(--tinta); box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.55); }
+.elegir::backdrop { background: rgba(38, 21, 95, 0.6); }
+.elegir h2 { font-family: var(--display); font-weight: 800; font-size: 1.9rem; line-height: 1; color: var(--morado-oscuro); padding-right: 2rem; }
+.elegir p { margin-top: 0.4rem; opacity: 0.8; }
+.elegir__cerrar { position: absolute; right: 0.8rem; top: 0.8rem; width: 36px; height: 36px; border-radius: 50%; font-size: 1.6rem; line-height: 1; }
+.elegir__cerrar:hover { background: rgba(0, 0, 0, 0.08); }
+.elegir__opciones { display: grid; gap: 0.7rem; margin-top: 1.3rem; }
+.elegir__opcion { display: grid; gap: 0.15rem; text-align: left; padding: 1rem 1.2rem; border-radius: 1.1rem; background: #fff; border: 2px solid var(--morado-oscuro); transition: transform 0.2s ease, background 0.2s ease; }
+.elegir__opcion:hover { transform: translateY(-2px); background: var(--lila-claro); }
+.elegir__opcion strong { font-family: var(--display); font-weight: 800; font-size: 1.25rem; color: var(--morado-oscuro); line-height: 1.1; }
+.elegir__opcion span { font-size: 0.9rem; opacity: 0.8; }
+.elegir__opcion--wa { border-color: var(--verde-wa); }
+.elegir__opcion--wa strong { color: #0c7a3c; }
+
 /* Panel de la tienda */
 .panel { background: var(--crema); min-height: 100svh; }
 .barra { background: var(--morado-oscuro); color: var(--crema); padding: calc(env(safe-area-inset-top, 0px) + 0.9rem) clamp(1rem, 4vw, 2rem) 0.9rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; position: sticky; top: 0; z-index: 2; }
@@ -476,6 +491,16 @@ input { font: inherit; color: inherit; }
     <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C8.8 3 3 8.6 3 15.5c0 2.5.8 4.9 2.200 6.900L3.500 29l6.900-1.800c1.700.8 3.600 1.300 5.600 1.300 7.200 0 13-5.600 13-12.500S23.200 3 16 3z" fill="currentColor"/></svg>
     <span>Pedir domi</span><b id="burbuja-n" hidden>0</b>
   </button>
+
+  <dialog class="elegir" id="elegir" aria-labelledby="elegir-titulo">
+    <button class="elegir__cerrar" id="elegir-cerrar" type="button" aria-label="Cerrar">×</button>
+    <h2 id="elegir-titulo">¿Por dónde querés pedir?</h2>
+    <p>En los dos te atiende el mismo asistente de Sauko.</p>
+    <div class="elegir__opciones">
+      <button class="elegir__opcion elegir__opcion--wa" id="elegir-whatsapp" type="button"><strong>Por WhatsApp</strong><span>Se abre el chat con Sauko y el mensaje ya escrito.</span></button>
+      <button class="elegir__opcion" id="elegir-chat" type="button"><strong>Por este chat</strong><span>Pedís aquí mismo, sin salir de la página.</span></button>
+    </div>
+  </dialog>
 
   <aside class="chat" id="chat" aria-label="Chat de pedidos" aria-hidden="true">
     <header class="chat__cabeza">
@@ -976,7 +1001,11 @@ function mensajeParaWhatsApp(mensaje) {
   const lineas = CLOSED.includes(order.status) ? [] : order.items.map(i => i.qty + ' x ' + BY_SKU.get(i.sku).name);
   return lineas.length ? 'Hola, quiero pedir:\n' + lineas.join('\n') : (mensaje || 'Hola, quiero hacer un pedido');
 }
-function abrirWhatsApp(mensaje) { location.href = 'https://wa.me/' + WHATSAPP_TIENDA + '?text=' + encodeURIComponent(mensajeParaWhatsApp(mensaje)); }
+function abrirWhatsApp(mensaje) {
+  const enlace = 'https://wa.me/' + WHATSAPP_TIENDA + '?text=' + encodeURIComponent(mensajeParaWhatsApp(mensaje));
+  // En celular abre la app; en computador, WhatsApp Web en otra pestaña para no perder la página.
+  if (esCelular() || !window.open(enlace, '_blank', 'noopener')) location.href = enlace;
+}
 function abrirChat(mensaje) {
   if (esCelular()) return abrirWhatsApp(mensaje);
   chat.classList.add('is-abierto'); chat.setAttribute('aria-hidden', 'false'); $('burbuja').classList.add('is-oculta');
@@ -1009,7 +1038,19 @@ $('chat-form').onsubmit = e => { e.preventDefault(); const t = $('chat-entrada')
 $('chat-sugerencias').onclick = e => { if (e.target.matches('button')) enviar(e.target.textContent); };
 $('chat-cerrar').onclick = cerrarChat;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarChat(); });
-document.querySelectorAll('[data-abrir-chat]').forEach(b => b.addEventListener('click', () => abrirChat(b.dataset.mensaje)));
+// En computador se pregunta por dónde pedir, salvo que ya haya una conversación en el chat.
+let mensajePendiente, eligioChat = false;
+function pedirDomi(mensaje) {
+  if (esCelular()) return abrirWhatsApp(mensaje);
+  if (eligioChat || turns.length || chat.classList.contains('is-abierto')) return abrirChat(mensaje);
+  mensajePendiente = mensaje;
+  $('elegir').showModal();
+}
+$('elegir-whatsapp').onclick = () => { $('elegir').close(); abrirWhatsApp(mensajePendiente); };
+$('elegir-chat').onclick = () => { eligioChat = true; $('elegir').close(); abrirChat(mensajePendiente); };
+$('elegir-cerrar').onclick = () => $('elegir').close();
+$('elegir').addEventListener('click', e => { if (e.target === $('elegir')) $('elegir').close(); });
+document.querySelectorAll('[data-abrir-chat]').forEach(b => b.addEventListener('click', () => pedirDomi(b.dataset.mensaje)));
 
 /* ---------- panel de la tienda ---------- */
 const COLS = [['por_confirmar', 'Pago por confirmar', 'Cuando un cliente envía su comprobante, el pedido aparece aquí.'], ['alistando', 'Alistando', 'Sin pedidos por alistar.'], ['en_camino', 'En camino', 'Ningún domicilio en la calle.']];
