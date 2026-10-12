@@ -27,6 +27,12 @@ export default async function handler(req, res) {
     return res.status(200).send("ok");
   }
 
+  // Si falta el teléfono o el identificador, se anota qué campos trajo el aviso para poder ajustarlo.
+  if (!m.from || !(m.wamid || m.id)) {
+    const forma = Object.fromEntries(Object.entries(m).map(([k, v]) => [k, typeof v === "object" && v ? Object.keys(v).join("+") : typeof v === "string" ? v.slice(0, 6) + "…(" + v.length + ")" : typeof v]));
+    await anotar("aviso sin teléfono o sin id", JSON.stringify(forma));
+  }
+
   const trabajo = atenderEntrante({
     id: m.wamid || m.id,
     telefono: m.from,
