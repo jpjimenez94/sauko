@@ -1273,7 +1273,7 @@ function tarjeta(o) {
     acts.append(yes, no);
   } else if (o.status === 'esperando_pago') {
     // El cliente cerró por transferencia y no ha mandado el comprobante: la tienda puede darlo por pagado o cancelarlo.
-    const pagado = dosPasos(h('button', { class: 'btn btn--morado', type: 'button' }, 'Ya pagó'), '¿Confirmar el pago?', () => act(o, { status: 'alistando' }));
+    const pagado = dosPasos(h('button', { class: 'btn btn--morado', type: 'button' }, 'Confirmar sin comprobante'), '¿Seguro que ya pagó?', () => act(o, { status: 'alistando' }));
     const cancelar = dosPasos(h('button', { class: 'btn btn--peligro', type: 'button' }, 'Cancelar'), '¿Cancelar el pedido?', () => store.remove(o.id).catch(() => { $('vivo-texto').textContent = 'No se pudo cancelar'; }));
     acts.append(pagado, cancelar, h('small', null, o.rechazo ? 'Comprobante rechazado; esperando uno nuevo' : 'Sin comprobante todavía'));
   } else if (picking) {
