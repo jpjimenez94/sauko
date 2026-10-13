@@ -1,4 +1,5 @@
-import { CATALOGO, METODOS_PAGO, totales, horario, exigirPin } from "../lib/comun.js";
+import { CATALOGO, METODOS_PAGO, totales, horario, cargarNegocio } from "../lib/comun.js";
+import { exigirSesion } from "../lib/usuarios.js";
 import { listarPedidos, leerPedido, guardarPedido, borrarPedido } from "../lib/store.js";
 import { avisoDeTienda } from "../lib/conversacion.js";
 import { enviarTexto } from "../lib/whatsapp.js";
@@ -56,11 +57,12 @@ export default async function handler(req, res) {
         const pedido = await leerPedido(texto(req.query.id, 40));
         return pedido ? res.status(200).json({ pedido: { ...pedido, proof: "", cliente: undefined } }) : res.status(404).json({ error: "No existe" });
       }
-      if (!exigirPin(req, res)) return;
+      if (!(await exigirSesion(req, res))) return;
       return res.status(200).json({ pedidos: await listarPedidos() });
     }
 
     if (req.method === "POST") {
+      await cargarNegocio();
       const anterior = await leerPedido(texto(req.body?.id, 40));
       // Cuando la tienda ya lo tomó, el cliente no puede reescribirlo.
       if (anterior && !["armando", "esperando_pago"].includes(anterior.status)) return res.status(409).json({ error: "El pedido ya está en la tienda." });
@@ -71,7 +73,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "PATCH") {
-      if (!exigirPin(req, res)) return;
+      if (!(await exigirSesion(req, res))) return;
       const pedido = await leerPedido(texto(req.body?.id, 40));
       const estado = req.body?.cambios?.status;
       if (!pedido || !DEL_PANEL.includes(estado)) return res.status(400).json({ error: "Cambio no válido" });
@@ -85,7 +87,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "DELETE") {
-      if (!exigirPin(req, res)) return;
+      if (!(await exigirSesion(req, res))) return;
       await borrarPedido(texto(req.query?.id, 40));
       return res.status(200).json({ ok: true });
     }

@@ -27,6 +27,8 @@ const rutas = {
   "/api/ycloud": () => import("./api/ycloud.js"),
   "/api/ajustes": () => import("./api/ajustes.js"),
   "/api/config": () => import("./api/config.js"),
+  "/api/sesion": () => import("./api/sesion.js"),
+  "/api/usuarios": () => import("./api/usuarios.js"),
 };
 
 function leerCuerpo(req) {

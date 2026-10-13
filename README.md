@@ -15,7 +15,7 @@ npm run dev
 ```
 
 - Página: http://localhost:3000
-- Panel de la tienda: http://localhost:3000/#panel (pide el `PANEL_PIN`; en local, sin PIN definido, queda abierto)
+- Panel de la tienda: http://localhost:3000/#panel (entra con usuario y contraseña; la primera vez pide crear el administrador con el `PANEL_PIN`, que en local sin PIN definido acepta cualquiera)
 
 Sin `ANTHROPIC_API_KEY` la página y el panel funcionan, pero el chat avisa que el asistente no está disponible.
 
@@ -28,7 +28,8 @@ Sin `ANTHROPIC_API_KEY` la página y el panel funcionan, pero el chat avisa que 
 | `public/fotos-*.json` | Fotos de producto por categoría (de Open Food Facts). |
 | `lib/agente.js` | Instrucciones y voz del asistente, definición de sus herramientas y la llamada a Claude. |
 | `lib/store.js` | Pedidos en Postgres si hay `DATABASE_URL` (con historial) o en Redis; conversaciones, agotados y ajustes en Redis. Sin bases, memoria (solo para local). |
-| `lib/comun.js` | Catálogo en el servidor, PIN del panel y tope de mensajes del chat. |
+| `lib/comun.js` | Catálogo en el servidor, parámetros del negocio (horario, tarifas, cuenta) y tope de mensajes del chat. |
+| `lib/usuarios.js` | Usuarios del panel, contraseñas (scrypt) y sesiones por cookie firmada. Roles: administrador y operativo. |
 | `api/chat.js` | Un paso del asistente. La página ejecuta las herramientas y vuelve con los resultados. |
 | `api/orders.js` | Pedidos. Recalcula nombres, precios y total con el catálogo antes de guardar. |
 | `api/agotados.js` | Productos marcados como agotados desde el panel. |
@@ -73,7 +74,7 @@ El token temporal de Meta vence en 24 horas; para dejarlo fijo se crea un usuari
 - **Audios.** Con `GROQ_API_KEY`, las notas de voz de WhatsApp se transcriben (Whisper en Groq) y el asistente las atiende. Falta probarlo con un audio real.
 - **WhatsApp.** El canal está construido pero sin probar con Meta: falta la app, el número real y la verificación del negocio. Por WhatsApp no hay existencias: solo se excluye lo marcado como agotado en el panel.
 - **Pago.** Contraentrega (el asistente pregunta con qué billete pagan y calcula la devuelta) o transferencia (lee el comprobante y la tienda lo confirma a mano). No hay verificación contra el banco.
-- **Horario de domicilios.** De 9 a.m. a 9 p.m. cuesta $2.000; de 9 a 10 p.m. es horario prime y cuesta $4.000; fuera de ese horario el pedido queda como encargo para el día siguiente. Todo se ajusta con variables (`DOMI_*`, `COSTO_DOMICILIO*`). Falta definir la zona de cobertura.
+- **Horario de domicilios.** De 9 a.m. a 9 p.m. cuesta $2.000; de 9 a 10 p.m. es horario prime y cuesta $4.000; fuera de ese horario el pedido queda como encargo para el día siguiente. Todo se ajusta desde el panel, en la pestaña Ajustes (las variables `DOMI_*` y `COSTO_DOMICILIO*` solo dan el valor inicial). Falta definir la zona de cobertura.
 - **QR de pago.** `public/qr-pago.jpg` es el QR de Bancolombia de la tienda; se muestra en el chat y se envía por WhatsApp al pedir una transferencia.
 - **Categorías.** Los productos que estaban en "Otros" se clasificaron automáticamente por nombre; conviene revisarlos.
 - **Fotos.** Cinco fotos de categoría son de referencia (Unsplash) y solo 598 productos tienen foto.

@@ -298,8 +298,18 @@ input { font: inherit; color: inherit; }
 
 .acceso-pin { display: none; max-width: 360px; margin: 3rem auto; padding: 1.5rem; background: #fff; border-radius: 18px; gap: 0.8rem; justify-items: start; }
 .acceso-pin h2 { font-family: var(--display); font-weight: 800; color: var(--morado-oscuro); font-size: 1.5rem; line-height: 1; }
-.panel.bloqueado .acceso-pin { display: grid; }
+.panel.bloqueado .acceso-pin:not([hidden]) { display: grid; }
 .panel.bloqueado .pestanas, .panel.bloqueado main { display: none; }
+.quien { font-size: 0.85rem; opacity: 0.85; white-space: nowrap; }
+.formulario { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.8rem; align-items: end; }
+.rotulo { display: grid; gap: 0.25rem; font-size: 0.82rem; font-weight: 700; min-width: 0; }
+.rotulo small { font-weight: 400; opacity: 0.7; }
+.rotulo .campo { max-width: none; font-weight: 400; font-size: 1rem; }
+.acceso-pin .rotulo { width: 100%; }
+.clave-nueva { background: var(--ok-bg); color: var(--ok); border-radius: 14px; padding: 0.8rem 1rem; display: grid; gap: 0.5rem; justify-items: start; }
+.clave-nueva code { font-family: ui-monospace, Consolas, monospace; font-size: 1.3rem; font-weight: 700; letter-spacing: 0.06em; user-select: all; color: var(--tinta); overflow-wrap: anywhere; }
+.mini--mal { border-color: var(--mal); color: var(--mal); }
+.interruptor:disabled { opacity: 0.7; cursor: default; }
 .interruptor { padding: 0.55rem 1rem; border-radius: 999px; font-weight: 700; border: 2px solid var(--lila); color: var(--crema); white-space: nowrap; }
 .interruptor[aria-pressed="true"] { background: var(--verde-wa); border-color: var(--verde-wa); color: #fff; }
 .pestanas { display: flex; gap: 0.4rem; padding: 0.6rem clamp(1rem, 4vw, 2rem); background: #fff; border-bottom: 1px solid rgba(0, 0, 0, 0.08); overflow-x: auto; }
@@ -539,20 +549,35 @@ input { font: inherit; color: inherit; }
     <h1>Panel de la tienda</h1>
     <span class="vivo"><i></i><span id="vivo-texto">En vivo</span></span>
     <button class="interruptor" id="wa-interruptor" type="button" aria-pressed="false" hidden>WhatsApp: apagado</button>
+    <span class="quien" id="quien" hidden></span>
+    <button class="btn btn--linea" id="salir" type="button" hidden>Salir</button>
     <button class="btn btn--sol" type="button" data-vista="tienda">Volver a la página</button>
   </header>
-  <form class="acceso-pin" id="pin-form">
+  <form class="acceso-pin" id="login-form">
     <h2>Entrar al panel</h2>
-    <p>Escribe el PIN de la tienda.</p>
-    <input class="campo" id="pin" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN de la tienda">
+    <label class="rotulo">Usuario<input class="campo" id="login-usuario" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+    <label class="rotulo">Contraseña<input class="campo" id="login-clave" type="password" autocomplete="current-password" required></label>
     <button class="btn btn--morado" type="submit">Entrar</button>
-    <p class="vacio" id="pin-error" role="alert"></p>
+    <p class="vacio" id="login-error" role="alert"></p>
+  </form>
+  <form class="acceso-pin" id="primer-form" hidden>
+    <h2>Crear el administrador</h2>
+    <p>El panel todavía no tiene usuarios. Crea el primero: será el administrador y podrá crear a los demás.</p>
+    <label class="rotulo">Nombre<input class="campo" id="primer-nombre" type="text" autocomplete="name" maxlength="60" required></label>
+    <label class="rotulo">Usuario <small>minúsculas, números, punto o guion; mínimo 3</small><input class="campo" id="primer-usuario" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+    <label class="rotulo">Contraseña <small>mínimo 8 caracteres</small><input class="campo" id="primer-clave" type="password" autocomplete="new-password" minlength="8" required></label>
+    <label class="rotulo">PIN de instalación <small>el valor de PANEL_PIN en Vercel</small><input class="campo" id="primer-pin" type="password" autocomplete="off" required></label>
+    <button class="btn btn--morado" type="submit">Crear y entrar</button>
+    <p class="vacio" id="primer-error" role="alert"></p>
   </form>
   <nav class="pestanas" role="tablist" aria-label="Secciones del panel">
     <button role="tab" aria-selected="true" data-pest="pedidos">Pedidos <span class="cuenta num" id="t-pedidos">0</span></button>
     <button role="tab" aria-selected="false" data-pest="resumen">Resumen</button>
     <button role="tab" aria-selected="false" data-pest="inventario">Inventario <span class="cuenta num" id="t-agotados" hidden>0</span></button>
     <button role="tab" aria-selected="false" data-pest="estanteria">Estantería</button>
+    <button role="tab" aria-selected="false" data-pest="ajustes" data-solo-admin hidden>Ajustes</button>
+    <button role="tab" aria-selected="false" data-pest="usuarios" data-solo-admin hidden>Usuarios</button>
+    <button role="tab" aria-selected="false" data-pest="cuenta">Mi cuenta</button>
   </nav>
   <main>
     <div class="vista" id="pest-pedidos">
@@ -624,6 +649,85 @@ input { font: inherit; color: inherit; }
       <p class="vacio">La columna Siigo es editable: escribe la existencia real para ver la diferencia. La IA no ve las filas de atrás.</p>
     </div>
 
+    <div class="vista" id="pest-ajustes" hidden>
+      <p class="intro">Lo que se cambie aquí aplica de inmediato en la página, en el chat y en WhatsApp. Solo lo ven los administradores.</p>
+      <form class="vista" id="aj-form">
+        <section class="caja">
+          <h2>Domicilios</h2>
+          <div class="formulario">
+            <label class="rotulo">Empiezan a las<select class="campo" id="aj-domiDesde"></select></label>
+            <label class="rotulo">Tarifa normal hasta las<select class="campo" id="aj-domiHasta"></select></label>
+            <label class="rotulo">Horario prime hasta las <small>igual a la anterior = sin horario prime</small><select class="campo" id="aj-domiPrimeHasta"></select></label>
+            <label class="rotulo">Valor del domicilio ($)<input class="campo" id="aj-costoDomicilio" type="number" min="0" max="100000" step="100" inputmode="numeric" required></label>
+            <label class="rotulo">Valor en horario prime ($)<input class="campo" id="aj-costoDomicilioPrime" type="number" min="0" max="100000" step="100" inputmode="numeric" required></label>
+          </div>
+          <p class="vacio" id="aj-vista-horario"></p>
+        </section>
+        <section class="caja">
+          <h2>Cuenta para transferencias</h2>
+          <div class="formulario">
+            <label class="rotulo">Banco y tipo de cuenta<input class="campo" id="aj-banco" type="text" maxlength="60" placeholder="Bancolombia, ahorros"></label>
+            <label class="rotulo">Número de cuenta<input class="campo" id="aj-cuenta" type="text" maxlength="40" inputmode="numeric"></label>
+            <label class="rotulo">A nombre de<input class="campo" id="aj-titular" type="text" maxlength="80"></label>
+            <label class="rotulo">Llave<input class="campo" id="aj-llave" type="text" maxlength="60"></label>
+          </div>
+          <p class="vacio" id="aj-vista-cuenta"></p>
+        </section>
+        <section class="caja">
+          <h2>Asistente de WhatsApp</h2>
+          <div class="formulario">
+            <label class="rotulo">Lista de prueba <small>teléfonos con 57 o @usuario, separados por coma. Vacía = le contesta a todos</small><input class="campo" id="aj-listaDePrueba" type="text" maxlength="600" autocapitalize="none" spellcheck="false"></label>
+            <label class="rotulo">Pausa cuando la tienda contesta a mano (minutos) <small>0 = no se pausa</small><input class="campo" id="aj-pausaMinutos" type="number" min="0" max="720" step="5" inputmode="numeric" required></label>
+          </div>
+        </section>
+        <div class="acciones"><button class="btn btn--morado" type="submit">Guardar ajustes</button><p class="vacio" id="aj-estado" role="status"></p></div>
+      </form>
+      <section class="bitacora">
+        <h2>Diagnóstico de WhatsApp</h2>
+        <div class="acciones"><button class="btn btn--linea" id="aj-ver-bitacora" type="button">Ver los últimos pasos</button></div>
+        <div class="bitacora__lista" id="aj-bitacora"></div>
+      </section>
+    </div>
+
+    <div class="vista" id="pest-usuarios" hidden>
+      <p class="intro">El administrador maneja todo el panel, los ajustes y los usuarios. El operativo gestiona pedidos, inventario y estantería.</p>
+      <section class="caja">
+        <h2>Crear usuario</h2>
+        <form class="formulario" id="us-form">
+          <label class="rotulo">Nombre<input class="campo" id="us-nombre" type="text" maxlength="60" required></label>
+          <label class="rotulo">Usuario <small>minúsculas, números, punto o guion</small><input class="campo" id="us-usuario" type="text" autocapitalize="none" spellcheck="false" autocomplete="off" required></label>
+          <label class="rotulo">Rol<select class="campo" id="us-rol"><option value="operativo">Operativo</option><option value="admin">Administrador</option></select></label>
+          <button class="btn btn--morado" type="submit">Crear y generar contraseña</button>
+        </form>
+        <div class="clave-nueva" id="us-clave" hidden>
+          <span id="us-clave-texto"></span>
+          <code id="us-clave-valor"></code>
+          <div class="acciones"><button class="mini" id="us-clave-copiar" type="button">Copiar</button><button class="mini" id="us-clave-ocultar" type="button">Ya la anoté</button></div>
+          <span>Entrégasela ahora: no se vuelve a mostrar. La persona puede cambiarla en "Mi cuenta".</span>
+        </div>
+        <p class="vacio" id="us-estado" role="status"></p>
+      </section>
+      <div class="caja tabla-caja">
+        <table>
+          <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Acciones</th></tr></thead>
+          <tbody id="us-filas"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="vista" id="pest-cuenta" hidden>
+      <section class="caja">
+        <h2>Cambiar mi contraseña</h2>
+        <form class="formulario" id="cu-form">
+          <label class="rotulo">Contraseña actual<input class="campo" id="cu-actual" type="password" autocomplete="current-password" required></label>
+          <label class="rotulo">Contraseña nueva <small>mínimo 8 caracteres</small><input class="campo" id="cu-nueva" type="password" autocomplete="new-password" minlength="8" required></label>
+          <label class="rotulo">Repite la nueva<input class="campo" id="cu-repetir" type="password" autocomplete="new-password" minlength="8" required></label>
+          <button class="btn btn--morado" type="submit">Cambiar contraseña</button>
+        </form>
+        <p class="vacio" id="cu-estado" role="status"></p>
+      </section>
+    </div>
+
     <ul class="notas">
       <li>Productos, códigos y precios son los del catálogo actual. En producción salen de Siigo.</li>
       <li>Las categorías de los productos que estaban en "Otros" se asignaron automáticamente por el nombre; conviene revisarlas.</li>
@@ -677,7 +781,7 @@ function verVista(nombre, alTerminar) {
   if (lenis) { lenis.resize(); lenis.scrollTo(0, { immediate: true }); } else scrollTo(0, 0);
   if (hayGsap) ScrollTrigger.refresh();
   try { history.replaceState(null, '', nombre === 'tienda' ? '#inicio' : '#' + nombre); } catch (e) {}
-  if (nombre === 'panel' && store) store.traerPedidos();
+  if (nombre === 'panel' && store) entrarAlPanel();
   if (alTerminar) setTimeout(alTerminar, 80);
 }
 function irA(sel, offset = 0) { const el = document.querySelector(sel); if (!el) return; if (lenis) lenis.scrollTo(el, { offset }); else { const y = el.getBoundingClientRect().top + scrollY + offset; scrollTo({ top: y, behavior: sinMovimiento ? 'auto' : 'smooth' }); } }
@@ -719,16 +823,16 @@ function search(q, k = 8, pool = CAT) {
 }
 
 /* ---------- almacén: pedidos y agotados viven en el servidor (/api) ---------- */
-let PIN = ''; try { PIN = sessionStorage.getItem('sauko-pin') || ''; } catch (e) {}
+// El panel se identifica con la cookie de sesión, que el navegador manda sola.
 async function pedir(url, opciones = {}) {
-  const r = await fetch(url, { ...opciones, headers: { 'Content-Type': 'application/json', 'x-panel-pin': PIN, ...(opciones.headers || {}) } });
+  const r = await fetch(url, { ...opciones, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(opciones.headers || {}) } });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(d.error || 'No se pudo completar'), { status: r.status });
+  if (!r.ok) throw Object.assign(new Error(d.error || 'No se pudo completar'), { status: r.status, datos: d });
   return d;
 }
 function apiStore() {
   const todos = [], propios = [], agotados = [];
-  const traerPedidos = () => pedir('/api/orders').then(d => { panelListo(true); todos.forEach(f => f(d.pedidos || [])); }).catch(e => { if (e.status === 401 || e.status === 503) panelListo(false, e.message); else $('vivo-texto').textContent = 'Sin conexión'; });
+  const traerPedidos = () => pedir('/api/orders').then(d => { panelListo(true); todos.forEach(f => f(d.pedidos || [])); }).catch(e => { if (e.status === 401) revisarSesion(); else $('vivo-texto').textContent = 'Sin conexión'; });
   const traerAgotados = () => pedir('/api/agotados').then(d => agotados.forEach(f => f(d.skus || {}))).catch(() => {});
   // El panel se refresca cada 3 s mientras está abierto; el cliente consulta solo su pedido en curso.
   setInterval(() => { if (vistaActual === 'panel' && panelAbierto) traerPedidos(); }, 3000);
@@ -771,7 +875,7 @@ function snapshot(o) {
 }
 const SHOP_MSG = { alistando: o => 'Pago confirmado. Ya estamos alistando tu pedido #' + o.no + ' y llega en máximo 10 minutos.',
   esperando_pago: o => 'No pudimos confirmar el pago del pedido #' + o.no + '. ¿Nos envías de nuevo el comprobante, por favor?',
-  en_camino: o => '¡Ve, llego! Tu pedido #' + o.no + ' ya va en camino.', entregado: () => 'Pedido entregado. Gracias por comprar en Sauko Store.' };
+  en_camino: o => 'Veci, tu pedido #' + o.no + ' ya va en camino.', entregado: () => 'Pedido entregado. Gracias por comprar en Sauko Store.' };
 async function sync() {
   const o = order; if (o.status === 'armando' && !o.saved) return;
   const s = await storeReady;
@@ -1084,11 +1188,41 @@ document.querySelectorAll('[data-abrir-chat]').forEach(b => b.addEventListener('
 const COLS = [['por_confirmar', 'Pago por confirmar', 'Cuando un cliente envía su comprobante, el pedido aparece aquí.'], ['alistando', 'Alistando', 'Sin pedidos por alistar.'], ['en_camino', 'En camino', 'Ningún domicilio en la calle.']];
 const VENDIDO = ['alistando', 'en_camino', 'entregado'];
 let panelOrders = [], picked = new Map(), store = null, panelAbierto = false;
-function panelListo(ok, mensaje) { panelAbierto = ok; $('panel').classList.toggle('bloqueado', !ok); if (!ok && mensaje && PIN) $('pin-error').textContent = mensaje; if (ok) { $('pin-error').textContent = ''; $('vivo-texto').textContent = 'En vivo'; if ($('wa-interruptor').hidden) pedir('/api/ajustes').then(pintarWhatsApp).catch(() => {}); } }
-// Interruptor del asistente de WhatsApp: la tienda lo enciende y lo apaga cuando quiera.
-function pintarWhatsApp(a) { const b = $('wa-interruptor'); b.hidden = false; b.setAttribute('aria-pressed', String(!!a.whatsappActivo)); b.textContent = !a.whatsappConectado ? 'WhatsApp: sin conectar' : a.whatsappActivo ? 'WhatsApp: encendido' : 'WhatsApp: apagado'; b.disabled = !a.whatsappConectado; }
+// Sesión del panel: quién entró y con qué rol. El servidor es quien manda; esto solo decide qué se muestra.
+let YO = null;
+function panelListo(ok) { panelAbierto = ok; $('panel').classList.toggle('bloqueado', !ok); if (ok) $('vivo-texto').textContent = 'En vivo'; }
+function pintarSesion() {
+  const admin = !!YO && YO.rol === 'admin';
+  $('quien').hidden = $('salir').hidden = !YO;
+  $('quien').textContent = YO ? YO.nombre + ' · ' + (admin ? 'Administrador' : 'Operativo') : '';
+  document.querySelectorAll('[data-solo-admin]').forEach(n => { n.hidden = !admin; });
+  if (!YO) $('wa-interruptor').hidden = true;
+}
+function sesionAbierta(usuario) {
+  YO = usuario; pintarSesion(); verPestana('pedidos'); panelListo(true);
+  for (const f of ['login-form', 'primer-form']) $(f).reset();
+  $('login-error').textContent = ''; $('primer-error').textContent = '';
+  if (store) store.traerPedidos();
+  cargarAjustes();
+}
+async function revisarSesion() {
+  try { sesionAbierta((await pedir('/api/sesion')).usuario); }
+  catch (e) {
+    YO = null; pintarSesion(); panelListo(false); panelOrders = []; yaAvisados = null; renderPanel();
+    const primero = e.status === 401 && !!(e.datos && e.datos.sinUsuarios);
+    $('primer-form').hidden = !primero; $('login-form').hidden = primero;
+    if (e.status !== 401) $('login-error').textContent = 'Sin conexión con el servidor. Intenta de nuevo.';
+  }
+}
+function entrarAlPanel() { if (YO) store.traerPedidos(); else revisarSesion(); }
+$('login-form').onsubmit = e => { e.preventDefault(); $('login-error').textContent = '';
+  pedir('/api/sesion', { method: 'POST', body: JSON.stringify({ usuario: $('login-usuario').value, clave: $('login-clave').value }) }).then(d => sesionAbierta(d.usuario)).catch(err => { $('login-clave').value = ''; $('login-error').textContent = err.message; }); };
+$('primer-form').onsubmit = e => { e.preventDefault(); $('primer-error').textContent = '';
+  pedir('/api/usuarios', { method: 'POST', headers: { 'x-panel-pin': $('primer-pin').value }, body: JSON.stringify({ usuario: $('primer-usuario').value, nombre: $('primer-nombre').value, clave: $('primer-clave').value }) }).then(d => sesionAbierta(d.usuario)).catch(err => { $('primer-error').textContent = err.message; }); };
+$('salir').onclick = () => pedir('/api/sesion', { method: 'DELETE' }).catch(() => {}).then(revisarSesion);
+// Interruptor del asistente de WhatsApp: el administrador lo enciende y lo apaga cuando quiera.
+function pintarWhatsApp(a) { const b = $('wa-interruptor'); b.hidden = false; b.setAttribute('aria-pressed', String(!!a.whatsappActivo)); b.textContent = !a.whatsappConectado ? 'WhatsApp: sin conectar' : a.whatsappActivo ? 'WhatsApp: encendido' : 'WhatsApp: apagado'; b.disabled = !a.whatsappConectado || !YO || YO.rol !== 'admin'; }
 $('wa-interruptor').onclick = () => { const encender = $('wa-interruptor').getAttribute('aria-pressed') !== 'true'; pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ whatsappActivo: encender }) }).then(pintarWhatsApp).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); };
-$('pin-form').onsubmit = e => { e.preventDefault(); PIN = $('pin').value.trim(); try { sessionStorage.setItem('sauko-pin', PIN); } catch (err) {} $('pin').value = ''; store.traerPedidos(); };
 function act(o, patch) { store.patch(o.id, patch).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); }
 function tarjeta(o) {
   const el = h('article', { class: 'tarjeta' }), items = Array.isArray(o.items) ? o.items : [];
@@ -1169,10 +1303,76 @@ function renderPanel() {
   barras('r-canal', agrupar(vendidos, o => String(o.canal || 'Web'), () => 1), n => n + (n === 1 ? ' pedido' : ' pedidos'));
 }
 $('limpiar').onclick = () => panelOrders.filter(o => o.status === 'entregado').forEach(o => store.remove(o.id).catch(() => {}));
-document.querySelectorAll('.pestanas button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.pestanas button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
-  for (const p of ['pedidos', 'resumen', 'inventario', 'estanteria']) $('pest-' + p).hidden = p !== b.dataset.pest;
-});
+function verPestana(nombre) {
+  document.querySelectorAll('.pestanas button').forEach(x => x.setAttribute('aria-selected', String(x.dataset.pest === nombre)));
+  document.querySelectorAll('.vista[id^="pest-"]').forEach(v => { v.hidden = v.id !== 'pest-' + nombre; });
+  if (nombre === 'usuarios') cargarUsuarios();
+  if (nombre === 'ajustes') cargarAjustes();
+}
+document.querySelectorAll('.pestanas button').forEach(b => b.onclick = () => verPestana(b.dataset.pest));
+
+/* Usuarios del panel: solo para administradores */
+const ROL = { admin: 'Administrador', operativo: 'Operativo' };
+// confirm() no se usa: el segundo toque sobre el mismo botón es la confirmación.
+function dosPasos(boton, pregunta, accion) {
+  const texto = boton.textContent;
+  boton.onclick = () => {
+    if (boton.dataset.listo) { delete boton.dataset.listo; boton.textContent = texto; return accion(); }
+    boton.dataset.listo = '1'; boton.textContent = pregunta;
+    setTimeout(() => { if (boton.dataset.listo) { delete boton.dataset.listo; boton.textContent = texto; } }, 5000);
+  };
+  return boton;
+}
+function mostrarClave(texto, clave) { $('us-clave-texto').textContent = texto; $('us-clave-valor').textContent = clave; $('us-clave-copiar').textContent = 'Copiar'; $('us-clave').hidden = false; }
+$('us-clave-ocultar').onclick = () => { $('us-clave-valor').textContent = ''; $('us-clave').hidden = true; };
+$('us-clave-copiar').onclick = () => { navigator.clipboard.writeText($('us-clave-valor').textContent).then(() => { $('us-clave-copiar').textContent = 'Copiada'; }).catch(() => { $('us-clave-copiar').textContent = 'Selecciónala y cópiala'; }); };
+const avisoUsuarios = e => { $('us-estado').textContent = e && e.message ? e.message : String(e || ''); };
+function pintarUsuarios(lista) {
+  $('us-filas').replaceChildren(...lista.map(u => {
+    const yo = YO && u.usuario === YO.usuario;
+    const rol = h('select', { disabled: yo, 'aria-label': 'Rol de ' + u.nombre }, ...Object.keys(ROL).map(r => h('option', { value: r, selected: r === u.rol }, ROL[r])));
+    rol.onchange = () => pedir('/api/usuarios', { method: 'PATCH', body: JSON.stringify({ usuario: u.usuario, accion: 'rol', rol: rol.value }) }).then(() => { avisoUsuarios(u.nombre + ' ahora es ' + ROL[rol.value].toLowerCase() + '.'); cargarUsuarios(); }).catch(e => { avisoUsuarios(e); cargarUsuarios(); });
+    const nueva = dosPasos(h('button', { class: 'mini', type: 'button' }, 'Generar nueva contraseña'), '¿Seguro? La actual deja de servir', () =>
+      pedir('/api/usuarios', { method: 'PATCH', body: JSON.stringify({ usuario: u.usuario, accion: 'clave' }) }).then(d => { avisoUsuarios(''); mostrarClave('Nueva contraseña de ' + u.usuario + ':', d.clave); }).catch(avisoUsuarios));
+    const borrar = yo ? null : dosPasos(h('button', { class: 'mini mini--mal', type: 'button' }, 'Eliminar'), '¿Eliminar a ' + u.usuario + '? Confirmar', () =>
+      pedir('/api/usuarios?usuario=' + encodeURIComponent(u.usuario), { method: 'DELETE' }).then(() => { avisoUsuarios('Usuario ' + u.usuario + ' eliminado.'); cargarUsuarios(); }).catch(avisoUsuarios));
+    return h('tr', null, h('td', null, u.nombre), h('td', null, u.usuario + (yo ? ' (tú)' : '')), h('td', null, rol), h('td', null, h('div', { class: 'acciones' }, nueva, borrar)));
+  }));
+}
+function cargarUsuarios() { return pedir('/api/usuarios').then(d => pintarUsuarios(d.usuarios || [])).catch(avisoUsuarios); }
+$('us-form').onsubmit = e => { e.preventDefault();
+  pedir('/api/usuarios', { method: 'POST', body: JSON.stringify({ usuario: $('us-usuario').value, nombre: $('us-nombre').value, rol: $('us-rol').value }) })
+    .then(d => { $('us-form').reset(); avisoUsuarios(''); mostrarClave('Usuario ' + d.usuario.usuario + ' creado. Su contraseña:', d.clave); cargarUsuarios(); }).catch(avisoUsuarios); };
+
+/* Mi cuenta */
+$('cu-form').onsubmit = e => { e.preventDefault();
+  if ($('cu-nueva').value !== $('cu-repetir').value) { $('cu-estado').textContent = 'La contraseña nueva y su repetición no coinciden.'; return; }
+  pedir('/api/sesion', { method: 'PATCH', body: JSON.stringify({ actual: $('cu-actual').value, nueva: $('cu-nueva').value }) })
+    .then(() => { $('cu-form').reset(); $('cu-estado').textContent = 'Contraseña cambiada. Las otras sesiones que tenías abiertas quedaron cerradas.'; }).catch(err => { $('cu-estado').textContent = err.message; }); };
+
+/* Ajustes del negocio: solo para administradores */
+const AJ_NUMEROS = ['domiDesde', 'domiHasta', 'domiPrimeHasta', 'costoDomicilio', 'costoDomicilioPrime', 'pausaMinutos'], AJ_TEXTOS = ['banco', 'cuenta', 'titular', 'llave', 'listaDePrueba'];
+const hora12 = n => n === 24 ? '12 a.m. (medianoche)' : n === 12 ? '12 p.m. (mediodía)' : (n % 12 || 12) + (n < 12 ? ' a.m.' : ' p.m.');
+for (const id of ['domiDesde', 'domiHasta', 'domiPrimeHasta']) for (let n = id === 'domiDesde' ? 0 : 1; n <= (id === 'domiDesde' ? 23 : 24); n++) $('aj-' + id).append(h('option', { value: String(n) }, hora12(n)));
+function leerAjustesDelFormulario() { const n = {}; for (const k of AJ_NUMEROS) n[k] = Number($('aj-' + k).value); for (const k of AJ_TEXTOS) n[k] = $('aj-' + k).value.trim(); return n; }
+function vistaPreviaAjustes() {
+  const n = leerAjustesDelFormulario();
+  $('aj-vista-horario').textContent = 'Domicilio a ' + pesos(n.costoDomicilio) + ' de ' + hora12(n.domiDesde) + ' a ' + hora12(n.domiHasta) + ' · ' + (n.domiPrimeHasta > n.domiHasta ? 'Horario prime a ' + pesos(n.costoDomicilioPrime) + ' de ' + hora12(n.domiHasta) + ' a ' + hora12(n.domiPrimeHasta) : 'Sin horario prime') + ' · Fuera de ese horario el pedido queda como encargo para el día siguiente.';
+  const partes = []; if (n.cuenta) partes.push([n.banco, 'cuenta ' + n.cuenta].filter(Boolean).join(', ') + (n.titular ? ', a nombre de ' + n.titular : '')); if (n.llave) partes.push('Llave: ' + n.llave);
+  $('aj-vista-cuenta').textContent = partes.length ? 'Así se lo dice el asistente al cliente: ' + partes.join('. ') : 'Sin cuenta ni llave, el asistente no puede dar datos para transferir.';
+}
+function pintarAjustes(n) { for (const k of [...AJ_NUMEROS, ...AJ_TEXTOS]) $('aj-' + k).value = n[k]; vistaPreviaAjustes(); }
+function cargarAjustes() { return pedir('/api/ajustes').then(a => { pintarWhatsApp(a); if (a.negocio) pintarAjustes(a.negocio); }).catch(() => {}); }
+$('aj-form').addEventListener('input', () => { $('aj-estado').textContent = ''; vistaPreviaAjustes(); });
+$('aj-form').onsubmit = e => { e.preventDefault();
+  const n = leerAjustesDelFormulario();
+  if (n.domiHasta <= n.domiDesde) { $('aj-estado').textContent = 'La tarifa normal debe terminar después de la hora en que empiezan los domicilios.'; return; }
+  if (n.domiPrimeHasta < n.domiHasta) { $('aj-estado').textContent = 'El horario prime no puede terminar antes que la tarifa normal.'; return; }
+  pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ negocio: n }) }).then(a => { pintarAjustes(a.negocio); $('aj-estado').textContent = 'Guardado. Ya aplica en la página, el chat y WhatsApp.'; cargarNegocio(); }).catch(err => { $('aj-estado').textContent = err.message; }); };
+$('aj-ver-bitacora').onclick = () => pedir('/api/ajustes?bitacora=1').then(d => {
+  const filas = (d.bitacora || []).map(l => { try { return typeof l === 'string' ? JSON.parse(l) : l; } catch (e) { return null; } }).filter(Boolean);
+  $('aj-bitacora').replaceChildren(...(filas.length ? filas.map(f => h('div', null, h('time', null, new Date(f.hora).toLocaleString('es-CO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })), h('span', null, f.paso + (f.detalle ? ' · ' + f.detalle : '')))) : [h('p', { class: 'vacio' }, 'Todavía no hay movimientos.')]));
+}).catch(err => { $('aj-bitacora').replaceChildren(h('p', { class: 'vacio' }, err.message)); });
 
 /* Inventario: existencias simuladas y agotados compartidos con la página */
 function renderInv() {
@@ -1286,7 +1486,7 @@ fetch('catalog.json').then(r => r.json()).then(d => {
 }).catch(() => { $('cat-accesos').replaceChildren(h('p', null, 'No se pudo cargar el catálogo. Recarga la página.')); });
 storeReady.then(s => { store = s; s.all(list => { panelOrders = list; avisarNuevos(list); renderPanel(); });
   s.agotados(mapa => { AGOTADOS = mapa || {}; pintarEstado(); renderInv(); });
-  if (vistaActual === 'panel') s.traerPedidos(); });
+  if (vistaActual === 'panel') entrarAlPanel(); });
 </script>
 </body>
 </html>
