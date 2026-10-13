@@ -1202,7 +1202,7 @@ $('elegir').addEventListener('click', e => { if (e.target === $('elegir')) $('el
 document.querySelectorAll('[data-abrir-chat]').forEach(b => b.addEventListener('click', () => pedirDomi(b.dataset.mensaje)));
 
 /* ---------- panel de la tienda ---------- */
-const COLS = [['por_confirmar', 'Pago por confirmar', 'Cuando un cliente envía su comprobante, el pedido aparece aquí.'], ['alistando', 'Alistando', 'Sin pedidos por alistar.'], ['en_camino', 'En camino', 'Ningún domicilio en la calle.']];
+const COLS = [['esperando_pago', 'Esperando pago', 'Nadie tiene un pago pendiente por enviar.'], ['por_confirmar', 'Pago por confirmar', 'Cuando un cliente envía su comprobante, el pedido aparece aquí.'], ['alistando', 'Alistando', 'Sin pedidos por alistar.'], ['en_camino', 'En camino', 'Ningún domicilio en la calle.']];
 const VENDIDO = ['alistando', 'en_camino', 'entregado'];
 let panelOrders = [], picked = new Map(), store = null, panelAbierto = false;
 // Sesión del panel: quién entró y con qué rol. El servidor es quien manda; esto solo decide qué se muestra.
@@ -1266,6 +1266,11 @@ function tarjeta(o) {
     yes.onclick = () => act(o, { status: 'alistando' });
     no.onclick = () => act(o, { status: 'esperando_pago', rechazo: Date.now(), proof: '', proofMonto: 0 });
     acts.append(yes, no);
+  } else if (o.status === 'esperando_pago') {
+    // El cliente cerró por transferencia y no ha mandado el comprobante: la tienda puede darlo por pagado o cancelarlo.
+    const pagado = dosPasos(h('button', { class: 'btn btn--morado', type: 'button' }, 'Ya pagó'), '¿Confirmar el pago?', () => act(o, { status: 'alistando' }));
+    const cancelar = dosPasos(h('button', { class: 'btn btn--peligro', type: 'button' }, 'Cancelar'), '¿Cancelar el pedido?', () => store.remove(o.id).catch(() => { $('vivo-texto').textContent = 'No se pudo cancelar'; }));
+    acts.append(pagado, cancelar, h('small', null, o.rechazo ? 'Comprobante rechazado; esperando uno nuevo' : 'Sin comprobante todavía'));
   } else if (picking) {
     const go = h('button', { class: 'btn btn--morado', type: 'button', disabled: set.size < items.length }, 'Despachar');
     go.onclick = () => act(o, { status: 'en_camino' });
