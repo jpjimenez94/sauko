@@ -1269,7 +1269,9 @@ function tarjeta(o) {
   } else if (picking) {
     const go = h('button', { class: 'btn btn--morado', type: 'button', disabled: set.size < items.length }, 'Despachar');
     go.onclick = () => act(o, { status: 'en_camino' });
-    acts.append(go, h('small', null, set.size + ' de ' + items.length + ' alistados'));
+    const completo = set.size >= items.length, todos = h('button', { class: 'btn btn--linea', type: 'button' }, completo ? 'Desmarcar todos' : 'Marcar todos');
+    todos.onclick = () => { picked.set(o.id, completo ? new Set() : new Set(items.map(i => i.sku))); renderPanel(); };
+    acts.append(todos, go, h('small', null, set.size + ' de ' + items.length + ' alistados'));
   } else if (o.status === 'en_camino') {
     const done = h('button', { class: 'btn btn--linea', type: 'button' }, 'Marcar entregado'); done.onclick = () => act(o, { status: 'entregado' }); acts.append(done);
   }
