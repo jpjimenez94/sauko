@@ -30,6 +30,7 @@ const rutas = {
   "/api/sesion": () => import("./api/sesion.js"),
   "/api/usuarios": () => import("./api/usuarios.js"),
   "/api/solicitados": () => import("./api/solicitados.js"),
+  "/api/foto": () => import("./api/foto.js"),
 };
 
 function leerCuerpo(req) {

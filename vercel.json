@@ -1,3 +1,3 @@
 {
-  "functions": { "api/*.js": { "maxDuration": 60, "includeFiles": "public/catalog.json" } }
+  "functions": { "api/*.js": { "maxDuration": 60, "includeFiles": "public/*.json" } }
 }

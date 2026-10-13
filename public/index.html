@@ -1032,7 +1032,17 @@ const TOOLS = [
     description: 'Busca en el catálogo de Sauko Store por palabras clave (marca, producto, tamaño). Devuelve hasta 8 productos con sku, nombre, precio en COP y si está disponible. Úsala antes de mencionar cualquier producto o precio.',
     inputSchema: { type: 'object', properties: { consulta: { type: 'string', description: 'Palabras clave, por ejemplo "coca cola 1.5"' } }, required: ['consulta'] },
     execute(input) { const q = String(input.consulta || ''), res = search(q); log('Buscó "' + q + '" en el catálogo: ' + res.length + ' resultado' + (res.length === 1 ? '' : 's'));
-      return res.map(p => ({ sku: p.sku, nombre: p.name, precio: p.price, disponible: avail(p) > 0 })); } },
+      return res.map(p => ({ sku: p.sku, nombre: p.name, precio: p.price, disponible: avail(p) > 0, tiene_foto: !!p.foto })); } },
+  { name: 'enviar_foto_producto',
+    description: 'Le envía al cliente la foto de un producto del catálogo. Úsala cuando pida ver un producto. Devuelve si se envió; no todos los productos tienen foto.',
+    inputSchema: { type: 'object', properties: { sku: { type: 'string', description: 'El sku que devolvió buscar_productos' } }, required: ['sku'] },
+    async execute(input) {
+      const p = BY_SKU.get(String(input.sku)); if (!p) throw new Error('Ese sku no existe; búscalo de nuevo');
+      const src = p.foto ? (await paquete(p.ti))[p.sku] : '';
+      if (!src || !String(src).startsWith('data:image/')) return { enviada: false, motivo: 'Ese producto no tiene foto' };
+      const el = h('div', { class: 'msg msg--bot' }, h('img', { src, alt: p.name }), p.name + ' · ' + pesos(p.price)); mensajes.append(el); mensajes.scrollTop = mensajes.scrollHeight;
+      log('Envió la foto de ' + p.name); return { enviada: true };
+    } },
   { name: 'anotar_producto_faltante',
     description: 'Anota un producto que el cliente pidió y que no existe en el catálogo, para que la tienda lo vea en su panel y decida si lo trae. Úsala solo después de buscarlo sin encontrarlo.',
     inputSchema: { type: 'object', properties: { producto: { type: 'string', description: 'Marca, producto y tamaño como lo pidió el cliente, por ejemplo "Leche de almendras Silk 946 ml"' } }, required: ['producto'] },
