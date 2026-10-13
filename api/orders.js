@@ -1,4 +1,4 @@
-import { CATALOGO, METODOS_PAGO, totales, exigirPin } from "../lib/comun.js";
+import { CATALOGO, METODOS_PAGO, totales, horario, exigirPin } from "../lib/comun.js";
 import { listarPedidos, leerPedido, guardarPedido, borrarPedido } from "../lib/store.js";
 import { avisoDeTienda } from "../lib/conversacion.js";
 import { enviarTexto } from "../lib/whatsapp.js";
@@ -36,6 +36,8 @@ function pedidoLimpio(entrada, anterior) {
     direccion,
     pago,
     pagaCon: pago === "Contraentrega" ? pagaCon : 0,
+    // Fuera del horario de domicilios queda como encargo; lo decide la hora del servidor, no la página.
+    encargo: anterior?.encargo || (entrada.status === "armando" ? "" : horario().encargo),
     status: entrada.status,
     items,
     total,

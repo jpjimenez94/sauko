@@ -225,6 +225,7 @@ input { font: inherit; color: inherit; }
 .chat__mensajes { flex: 1; overflow-y: auto; padding: 0.9rem; display: flex; flex-direction: column; gap: 0.45rem; overscroll-behavior: contain; }
 .msg { max-width: 84%; padding: 0.55rem 0.75rem; border-radius: 0.9rem; font-size: 0.94rem; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1); }
 .msg img { display: block; max-height: 140px; border-radius: 0.6rem; margin-bottom: 0.3rem; }
+.msg img.qr { max-height: none; width: 100%; max-width: 240px; }
 .msg--bot { background: #fff; align-self: flex-start; border-top-left-radius: 0.2rem; }
 .msg--yo { background: #d9fdd3; align-self: flex-end; border-top-right-radius: 0.2rem; }
 .msg--error { background: #ffe3de; color: #7a1c10; align-self: center; text-align: center; font-size: 0.85rem; max-width: 100%; }
@@ -445,7 +446,7 @@ input { font: inherit; color: inherit; }
         <h2 class="titulo"><span class="revela">Pasá por el local</span> <span class="revela">o te lo subimos.</span></h2>
       </div>
       <div class="local__lista">
-        <article class="fila"><div><h3>Local 23</h3><small>Hacienda Kachipay</small></div><p>Cl 60A #119C-84, Villa Fátima, Cali</p><p>Abierto hasta las 10 p.m.</p><button class="btn btn--dark" type="button" data-abrir-chat>Pedir aquí</button></article>
+        <article class="fila"><div><h3>Local 23</h3><small>Hacienda Kachipay</small></div><p>Cl 60A #119C-84, Villa Fátima, Cali</p><p>Domicilios de 9 a.m. a 10 p.m.</p><button class="btn btn--dark" type="button" data-abrir-chat>Pedir aquí</button></article>
         <article class="fila"><div><h3>WhatsApp</h3><small>Pedidos y domicilios</small></div><p>312 452 9879</p><p>Contraentrega o transferencia</p><a class="btn btn--dark" href="https://wa.me/573124529879">Escribir</a></article>
         <article class="fila"><div><h3>Instagram</h3><small>Novedades y antojos</small></div><p>@sauko.store</p><p>Productos de temporada</p><a class="btn btn--dark" href="https://www.instagram.com/sauko.store/">Ver perfil</a></article>
       </div>
@@ -750,8 +751,15 @@ const NEXT = { por_confirmar: ['alistando', 'esperando_pago'], alistando: ['en_c
 let order;
 function newOrder() { const t = Date.now(); order = { id: 'p' + t.toString(36) + Math.random().toString(36).slice(2, 10), no: 1000 + Math.floor(t / 1000) % 9000, items: [], direccion: '', pago: '', pagaCon: 0, status: 'armando', proof: '', proofMonto: 0, rechazo: 0, hora: t, saved: false }; }
 newOrder();
-// Lo que la página necesita del negocio (/api/config). El domicilio cuesta lo mismo en todo pedido.
-let NEGOCIO = { costoDomicilio: 2000, datosTransferencia: '' };
+// Lo que la página necesita del negocio en este momento (/api/config). El costo del domicilio y si
+// hay servicio dependen de la hora, así que se vuelve a pedir antes de cada mensaje y al cerrar.
+let NEGOCIO = { costoDomicilio: 2000, datosTransferencia: '', notaHorario: '', encargo: '' };
+async function cargarNegocio() {
+  try {
+    const c = await fetch('/api/config').then(r => r.json());
+    if (c && Number(c.costoDomicilio) >= 0) NEGOCIO = { costoDomicilio: Number(c.costoDomicilio), datosTransferencia: String(c.datosTransferencia || ''), notaHorario: String(c.notaHorario || ''), encargo: String(c.encargo || '') };
+  } catch (e) {}
+}
 function totals(items) {
   const subtotal = items.reduce((s, i) => s + i.qty * (i.price != null ? i.price : BY_SKU.get(i.sku).price), 0);
   const domicilio = subtotal === 0 ? 0 : NEGOCIO.costoDomicilio;
@@ -929,22 +937,28 @@ const TOOLS = [
   { name: 'cerrar_pedido',
     description: 'Cierra el pedido cuando el cliente confirmó productos, dirección y forma de pago. Con Transferencia lo deja esperando el comprobante y devuelve los datos de la cuenta. Con Contraentrega lo envía a la tienda para alistar y devuelve la devuelta; exige paga_con.',
     inputSchema: { type: 'object', properties: { paga_con: { type: 'integer', description: 'Solo Contraentrega: valor en COP del billete o efectivo con que paga el cliente' } } },
-    execute(input) {
+    async execute(input) {
       const falta = []; if (!order.items.length) falta.push('productos'); if (!order.direccion) falta.push('dirección'); if (!order.pago) falta.push('forma de pago (Transferencia o Contraentrega)');
       if (falta.length) throw new Error('Falta: ' + falta.join(', '));
       if (CLOSED.includes(order.status)) throw new Error('Ese pedido ya está en la tienda');
-      const total = totals(order.items).total;
-      if (order.pago === 'Contraentrega') {
+      // El total y si es encargo quedan fijos con la hora en que se cierra.
+      await cargarNegocio();
+      const o = order, total = totals(o.items).total;
+      const entrega = NEGOCIO.encargo ? 'Es un encargo: ' + NEGOCIO.encargo.replace('Encargo: ', '') + '. No prometas entrega antes.' : 'Llega en máximo 10 minutos.';
+      o.encargo = NEGOCIO.encargo;
+      if (o.pago === 'Contraentrega') {
         const billete = Math.floor(Number(input.paga_con) || 0);
         if (billete < total) throw new Error('Falta saber con cuánto paga el cliente; debe ser al menos ' + total + '. Pregúntale con qué billete paga.');
-        order.pagaCon = billete; order.status = 'alistando'; renderOrder(); sync();
-        log('Cerró el pedido #' + order.no + ' contraentrega: paga con ' + pesos(billete) + ', devuelta ' + pesos(billete - total));
-        return { total, paga_con: billete, devuelta: billete - total, siguiente: 'El pedido ya está en la tienda para alistar. Confírmale al cliente el total, que paga al recibir y cuánta devuelta le lleva el domi. Llega en máximo 10 minutos.' };
+        o.pagaCon = billete; o.status = 'alistando'; renderOrder(); sync();
+        log('Cerró el pedido #' + o.no + ' contraentrega: paga con ' + pesos(billete) + ', devuelta ' + pesos(billete - total));
+        return { total, paga_con: billete, devuelta: billete - total, siguiente: 'El pedido ya está en la tienda. Confírmale al cliente el total, que paga al recibir y cuánta devuelta le llevan. ' + entrega };
       }
-      order.status = 'esperando_pago'; renderOrder(); sync();
-      log('Pidió la transferencia de ' + pesos(total) + ' (pedido #' + order.no + ')');
+      o.status = 'esperando_pago'; renderOrder(); sync();
+      log('Pidió la transferencia de ' + pesos(total) + ' (pedido #' + o.no + ')');
       const datos = NEGOCIO.datosTransferencia;
-      return { total, datos_para_transferir: datos || null, siguiente: datos ? 'Dale al cliente esos datos tal cual y pídele la foto del comprobante con el botón de la cámara.' : 'Aún no tienes los datos de la cuenta: dile que la tienda se los comparte por este chat y pídele la foto del comprobante cuando pague. No inventes números de cuenta.' };
+      // El código QR de pago sale en el chat, debajo de la respuesta del asistente.
+      setTimeout(() => { const el = h('div', { class: 'msg msg--bot' }, h('img', { class: 'qr', src: 'qr-pago.jpg', alt: 'Código QR de Bancolombia para pagarle a Sauko Store' }), 'También podés pagar con este código QR desde la app de tu banco.'); mensajes.append(el); mensajes.scrollTop = mensajes.scrollHeight; }, 400);
+      return { total, datos_para_transferir: datos || null, siguiente: (datos ? 'Dale al cliente esos datos tal cual y pídele la foto del comprobante con el botón de la cámara. La página le muestra aparte el código QR de pago.' : 'Aún no tienes los datos de la cuenta: dile que la tienda se los comparte por este chat y pídele la foto del comprobante cuando pague. No inventes números de cuenta.') + ' ' + entrega };
     } },
   { name: 'registrar_comprobante',
     description: 'Registra el comprobante de pago que el cliente envió como imagen en este mensaje. Indica si la imagen es un comprobante legible y el monto que muestra. Devuelve si quedó recibido para que la tienda lo confirme.',
@@ -961,7 +975,7 @@ const TOOLS = [
     } },
 ];
 function stateText() {
-  return '\n\n[Estado del pedido en pantalla #' + order.no + ': ' + JSON.stringify({ estado: order.status, items: order.items.map(i => ({ sku: i.sku, nombre: BY_SKU.get(i.sku).name, cantidad: i.qty })), ...totals(order.items), direccion: order.direccion || null, metodo_pago: order.pago || null }) + ']';
+  return '\n\n[Estado del pedido en pantalla #' + order.no + ': ' + JSON.stringify({ estado: order.status, items: order.items.map(i => ({ sku: i.sku, nombre: BY_SKU.get(i.sku).name, cantidad: i.qty })), ...totals(order.items), direccion: order.direccion || null, metodo_pago: order.pago || null }) + (NEGOCIO.notaHorario ? '. ' + NEGOCIO.notaHorario : '') + ']';
 }
 const ERR = { rate_limited: 'Hay muchas solicitudes seguidas. Espera un momento y vuelve a enviar.', session_expired: 'Tu sesión venció. Inicia sesión de nuevo.',
   image_rejected: 'No se pudo leer esa imagen. Prueba con otra foto (JPG o PNG).', refused: 'El asistente no pudo responder ese mensaje. Escríbelo de otra forma.',
@@ -1032,6 +1046,7 @@ async function enviar(texto, img) {
   if (!sample) return agentGone();
   busy = true; $('chat-enviar').disabled = true; $('chat-sugerencias').hidden = true; setPending(null);
   bubble('yo', texto, img);
+  await cargarNegocio(); renderOrder();
   turns.push({ role: 'user', content: texto + (img ? (texto ? ' ' : '') + '[El cliente adjuntó una imagen en este mensaje]' : '') + stateText() });
   turnImage = img || null;
   const out = bubble('bot escribiendo', ''); out.innerHTML = '<i></i><i></i><i></i>';
@@ -1079,6 +1094,7 @@ function tarjeta(o) {
   const el = h('article', { class: 'tarjeta' }), items = Array.isArray(o.items) ? o.items : [];
   el.append(h('div', { class: 'tarjeta__cabeza' }, h('strong', { class: 'n num' }, '#' + o.no), h('small', { class: 'num' }, new Date(o.hora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) + ' · ' + String(o.canal || 'Web') + (o.cliente ? ' +' + String(o.cliente).replace(/^[+]/, '') : ''))));
   el.append(h('p', null, h('b', null, 'Entrega: '), String(o.direccion || '')));
+  if (o.encargo) el.append(h('p', null, h('span', { class: 'chip chip--mal' }, String(o.encargo))));
   const picking = o.status === 'alistando', set = picked.get(o.id) || new Set();
   el.append(h('ul', null, ...items.map((i, k) => { const p = BY_SKU.get(i.sku);
     const txt = h('span', null, i.qty + ' × ' + i.name, h('small', null, (p ? p.type + ' · ' : '') + i.sku));
@@ -1261,7 +1277,8 @@ function animar() {
 /* ---------- arranque ---------- */
 renderPanel(); renderOrder();
 if (hayGsap && !sinMovimiento) animar();
-fetch('/api/config').then(r => r.json()).then(c => { if (c && Number(c.costoDomicilio) >= 0) NEGOCIO = { costoDomicilio: Number(c.costoDomicilio), datosTransferencia: String(c.datosTransferencia || '') }; renderOrder(); }).catch(() => {});
+cargarNegocio().then(renderOrder);
+setInterval(() => cargarNegocio().then(renderOrder), 5 * 60000);
 fetch('catalog.json').then(r => r.json()).then(d => {
   loadCatalog(d); armarTienda(); renderOrder(); renderPanel(); renderInv(); estEjemplo();
   if (hayGsap && !sinMovimiento) { gsap.from('.acceso', { y: 50, opacity: 0, duration: 0.6, stagger: 0.05, ease: 'power3.out', clearProps: 'all', scrollTrigger: { trigger: '#cat-accesos', start: 'top 88%' } }); ScrollTrigger.refresh(); }

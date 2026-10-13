@@ -73,7 +73,8 @@ El token temporal de Meta vence en 24 horas; para dejarlo fijo se crea un usuari
 - **Audios.** Con `GROQ_API_KEY`, las notas de voz de WhatsApp se transcriben (Whisper en Groq) y el asistente las atiende. Falta probarlo con un audio real.
 - **WhatsApp.** El canal está construido pero sin probar con Meta: falta la app, el número real y la verificación del negocio. Por WhatsApp no hay existencias: solo se excluye lo marcado como agotado en el panel.
 - **Pago.** Contraentrega (el asistente pregunta con qué billete pagan y calcula la devuelta) o transferencia (lee el comprobante y la tienda lo confirma a mano). No hay verificación contra el banco.
-- **Cobertura y horario.** El domicilio cuesta $2.000 en todo pedido; falta definir la zona de cobertura y la hora de apertura.
+- **Horario de domicilios.** De 9 a.m. a 9 p.m. cuesta $2.000; de 9 a 10 p.m. es horario prime y cuesta $4.000; fuera de ese horario el pedido queda como encargo para el día siguiente. Todo se ajusta con variables (`DOMI_*`, `COSTO_DOMICILIO*`). Falta definir la zona de cobertura.
+- **QR de pago.** `public/qr-pago.jpg` es el QR de Bancolombia de la tienda; se muestra en el chat y se envía por WhatsApp al pedir una transferencia.
 - **Categorías.** Los productos que estaban en "Otros" se clasificaron automáticamente por nombre; conviene revisarlos.
 - **Fotos.** Cinco fotos de categoría son de referencia (Unsplash) y solo 598 productos tienen foto.
 - **Tope de gasto.** El límite de mensajes del chat es aproximado; el tope duro se configura en la consola de Anthropic.
