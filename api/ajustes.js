@@ -1,6 +1,6 @@
 import { exigirSesion } from "../lib/usuarios.js";
 import { cargarNegocio, negocioLimpio } from "../lib/comun.js";
-import { leerAjustes, guardarAjustes, leerBitacora } from "../lib/store.js";
+import { leerAjustes, guardarAjustes, leerBitacora, contarPromos } from "../lib/store.js";
 import { hayWhatsApp } from "../lib/whatsapp.js";
 
 // Ajustes del panel: el interruptor del asistente de WhatsApp y los parámetros del negocio
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
       const base = { whatsappActivo, whatsappConectado: hayWhatsApp() };
       if (yo.rol !== "admin") return res.status(200).json(base);
       const negocio = await cargarNegocio(true);
-      if (!req.query?.bitacora) return res.status(200).json({ ...base, negocio });
+      if (!req.query?.bitacora) return res.status(200).json({ ...base, negocio, promos: await contarPromos() });
       // Para diagnosticar: los últimos pasos del canal de WhatsApp.
       return res.status(200).json({ ...base, negocio, listaDePrueba: negocio.listaDePrueba, bitacora: await leerBitacora() });
     }

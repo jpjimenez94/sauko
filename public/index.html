@@ -237,7 +237,9 @@ input { font: inherit; color: inherit; }
 .chat__sugerencias { display: flex; gap: 0.4rem; padding: 0 0.8rem 0.5rem; overflow-x: auto; scrollbar-width: none; }
 .chat__sugerencias button { flex: none; padding: 0.4rem 0.8rem; border-radius: 999px; background: #fff; font-size: 0.82rem; border: 1px solid rgba(0, 0, 0, 0.1); }
 .chat__adjunto { padding: 0 0.9rem 0.3rem; font-size: 0.8rem; opacity: 0.75; }
-.chat__form { display: flex; gap: 0.45rem; padding: 0.5rem 0.8rem 0.8rem; align-items: center; }
+.chat__form { display: flex; gap: 0.45rem; padding: 0.5rem 0.8rem 0.4rem; align-items: center; }
+.chat__legal { font-size: 0.72rem; opacity: 0.7; text-align: center; padding: 0 0.8rem 0.6rem; }
+.chat__legal a { text-decoration: underline; }
 .chat__form input[type=text] { flex: 1; min-width: 0; border: 0; border-radius: 999px; padding: 0.75rem 1rem; background: #fff; }
 .chat__form .redondo { width: 44px; height: 44px; flex: none; border-radius: 50%; background: #075e54; color: #fff; display: grid; place-items: center; cursor: pointer; }
 .chat__form .redondo--claro { background: #fff; color: #075e54; }
@@ -494,6 +496,7 @@ input { font: inherit; color: inherit; }
     <p>Minimarket · Hacienda Kachipay, Cali · Domicilios a las unidades y conjuntos cercanos.</p>
     <div class="pie__redes">
       <a href="https://www.instagram.com/sauko.store/">Instagram</a>
+      <a href="privacidad.html">Política de datos</a>
       <button type="button" data-vista="panel">Panel de la tienda</button>
     </div>
   </footer>
@@ -540,6 +543,7 @@ input { font: inherit; color: inherit; }
       <input id="chat-entrada" type="text" autocomplete="off" placeholder="Escribí tu pedido" aria-label="Mensaje" maxlength="500">
       <button class="redondo" id="chat-enviar" type="submit" aria-label="Enviar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20.500 21 12 3 3.500v6.600l11 1.900-11 1.900z" fill="currentColor"/></svg></button>
     </form>
+    <p class="chat__legal">Al pedir aceptas nuestra <a href="privacidad.html" target="_blank" rel="noopener">política de datos</a>.</p>
   </aside>
 </div>
 
@@ -691,6 +695,7 @@ input { font: inherit; color: inherit; }
             <label class="rotulo">Lista de prueba <small>teléfonos con 57 o @usuario, separados por coma. Vacía = le contesta a todos</small><input class="campo" id="aj-listaDePrueba" type="text" maxlength="600" autocapitalize="none" spellcheck="false"></label>
             <label class="rotulo">Pausa cuando la tienda contesta a mano (minutos) <small>0 = no se pausa</small><input class="campo" id="aj-pausaMinutos" type="number" min="0" max="720" step="5" inputmode="numeric" required></label>
           </div>
+          <p class="vacio" id="aj-promos"></p>
         </section>
         <div class="acciones"><button class="btn btn--morado" type="submit">Guardar ajustes</button><p class="vacio" id="aj-estado" role="status"></p></div>
       </form>
@@ -1400,7 +1405,7 @@ function vistaPreviaAjustes() {
   $('aj-vista-cuenta').textContent = partes.length ? 'Así se lo dice el asistente al cliente: ' + partes.join('. ') : 'Sin cuenta ni llave, el asistente no puede dar datos para transferir.';
 }
 function pintarAjustes(n) { for (const k of [...AJ_NUMEROS, ...AJ_TEXTOS]) $('aj-' + k).value = n[k]; vistaPreviaAjustes(); }
-function cargarAjustes() { return pedir('/api/ajustes').then(a => { pintarWhatsApp(a); if (a.negocio) pintarAjustes(a.negocio); }).catch(() => {}); }
+function cargarAjustes() { return pedir('/api/ajustes').then(a => { pintarWhatsApp(a); if (a.negocio) pintarAjustes(a.negocio); if (a.promos != null) $('aj-promos').textContent = 'Clientes que autorizaron promociones respondiendo SI PROMOS: ' + a.promos + '.'; }).catch(() => {}); }
 $('aj-form').addEventListener('input', () => { $('aj-estado').textContent = ''; vistaPreviaAjustes(); });
 $('aj-form').onsubmit = e => { e.preventDefault();
   const n = leerAjustesDelFormulario();
