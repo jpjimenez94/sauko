@@ -26,6 +26,7 @@ const rutas = {
   "/api/whatsapp": () => import("./api/whatsapp.js"),
   "/api/ycloud": () => import("./api/ycloud.js"),
   "/api/ajustes": () => import("./api/ajustes.js"),
+  "/api/config": () => import("./api/config.js"),
 };
 
 function leerCuerpo(req) {

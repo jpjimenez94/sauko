@@ -8,6 +8,7 @@
     "revisar": "node revisar.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "latest"
+    "@anthropic-ai/sdk": "latest",
+    "pg": "^8.13.0"
   }
 }

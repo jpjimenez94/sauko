@@ -1,10 +1,11 @@
-import { CATALOGO, COSTO_DOMICILIO, DOMICILIO_GRATIS_DESDE, exigirPin } from "../lib/comun.js";
+import { CATALOGO, METODOS_PAGO, totales, exigirPin } from "../lib/comun.js";
 import { listarPedidos, leerPedido, guardarPedido, borrarPedido } from "../lib/store.js";
 import { avisoDeTienda } from "../lib/conversacion.js";
 import { enviarTexto } from "../lib/whatsapp.js";
 
 // Estados que puede poner la página del cliente y estados que solo mueve el panel.
-const DEL_CLIENTE = ["armando", "esperando_pago", "por_confirmar"];
+// "alistando" solo lo puede poner el cliente cuando paga contraentrega: no hay pago que confirmar.
+const DEL_CLIENTE = ["armando", "esperando_pago", "por_confirmar", "alistando"];
 const DEL_PANEL = ["esperando_pago", "alistando", "en_camino", "entregado"];
 const texto = (v, max) => String(v ?? "").slice(0, max);
 
@@ -21,19 +22,23 @@ function pedidoLimpio(entrada, anterior) {
     items.push({ sku: String(it.sku), name: producto.nombre, price: producto.precio, qty });
   }
   if (!items.length && entrada.status !== "armando") return null;
-  const subtotal = items.reduce((s, i) => s + i.qty * i.price, 0);
-  const domicilio = subtotal === 0 || subtotal >= DOMICILIO_GRATIS_DESDE ? 0 : COSTO_DOMICILIO;
+  const { total } = totales(items);
+  const pago = METODOS_PAGO.includes(entrada.pago) ? entrada.pago : "";
+  const direccion = texto(entrada.direccion, 160);
+  const pagaCon = Math.max(0, Math.floor(Number(entrada.pagaCon) || 0));
   const proof = typeof entrada.proof === "string" && entrada.proof.startsWith("data:image/jpeg;base64,") && entrada.proof.length <= 300_000 ? entrada.proof : "";
-  if (entrada.status === "por_confirmar" && !proof) return null;
+  if (entrada.status === "por_confirmar" && (pago !== "Transferencia" || !proof)) return null;
+  if (entrada.status === "alistando" && (pago !== "Contraentrega" || !direccion || pagaCon < total)) return null;
   return {
     id,
     no: anterior?.no ?? Math.floor(Number(entrada.no)) % 100000,
     canal: "Web",
-    direccion: texto(entrada.direccion, 160),
-    pago: ["Nequi", "Transferencia"].includes(entrada.pago) ? entrada.pago : "",
+    direccion,
+    pago,
+    pagaCon: pago === "Contraentrega" ? pagaCon : 0,
     status: entrada.status,
     items,
-    total: subtotal + domicilio,
+    total,
     proof,
     proofMonto: Math.max(0, Math.floor(Number(entrada.proofMonto) || 0)),
     rechazo: anterior?.rechazo ?? 0,

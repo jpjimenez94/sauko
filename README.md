@@ -27,7 +27,7 @@ Sin `ANTHROPIC_API_KEY` la página y el panel funcionan, pero el chat avisa que 
 | `public/catalog.json` | Catálogo: código, nombre, precio, categoría y si tiene foto. Es la fuente de precios del servidor. |
 | `public/fotos-*.json` | Fotos de producto por categoría (de Open Food Facts). |
 | `lib/agente.js` | Instrucciones y voz del asistente, definición de sus herramientas y la llamada a Claude. |
-| `lib/store.js` | Pedidos y agotados: Redis de Upstash si está conectado; si no, memoria (solo para local). |
+| `lib/store.js` | Pedidos en Postgres si hay `DATABASE_URL` (con historial) o en Redis; conversaciones, agotados y ajustes en Redis. Sin bases, memoria (solo para local). |
 | `lib/comun.js` | Catálogo en el servidor, PIN del panel y tope de mensajes del chat. |
 | `api/chat.js` | Un paso del asistente. La página ejecuta las herramientas y vuelve con los resultados. |
 | `api/orders.js` | Pedidos. Recalcula nombres, precios y total con el catálogo antes de guardar. |
@@ -42,20 +42,21 @@ Sin `ANTHROPIC_API_KEY` la página y el panel funcionan, pero el chat avisa que 
 
 1. Importar este repositorio en Vercel (sin framework; no necesita build).
 2. En Storage, crear una base **Upstash for Redis** y conectarla al proyecto. Vercel agrega `KV_REST_API_URL` y `KV_REST_API_TOKEN`. Sin esta base los pedidos no llegan al panel.
-3. En Settings → Environment Variables, agregar `ANTHROPIC_API_KEY` y `PANEL_PIN`.
-4. Desplegar y conectar el dominio.
+3. En Settings → Environment Variables, agregar `ANTHROPIC_API_KEY`, `PANEL_PIN` y `DATOS_TRANSFERENCIA` (la cuenta y la llave que el asistente le dicta al cliente).
+4. Para guardar el historial de pedidos, crear una base Postgres (Neon en Storage, o Railway) y agregar su `DATABASE_URL`. La tabla se crea sola.
+5. Desplegar y conectar el dominio.
 
 ## Conectar WhatsApp por YCloud
 
 Es el camino elegido: el número de la tienda sigue funcionando en su app WhatsApp Business.
 
 1. Crear la cuenta en ycloud.com y conectar el número con la opción de WhatsApp Business App (coexistencia).
-2. En Developers → API Keys, crear la clave. En Developers → Webhook, agregar `https://<dominio>/api/ycloud` con el evento `whatsapp.inbound_message.received` y copiar el secreto.
+2. En Developers → API Keys, crear la clave. En Developers → Webhook, agregar `https://<dominio>/api/ycloud` con los eventos `whatsapp.inbound_message.received` y `whatsapp.smb.message.echoes`, y copiar el secreto.
 3. En Vercel, agregar `YCLOUD_API_KEY`, `YCLOUD_FROM` (el número con +57) y `YCLOUD_WEBHOOK_SECRET`, y volver a desplegar.
 
 El asistente de WhatsApp arranca **apagado**: se enciende y se apaga con el botón "WhatsApp" del panel, al instante. Con `WHATSAPP_SOLO_NUMEROS` además se limita a ciertos teléfonos para una prueba piloto.
 
-Pendiente: cuando el dueño responde a mano desde el celular, el asistente no se entera y puede contestar también.
+Cuando alguien de la tienda le contesta a mano a un cliente desde el celular (evento `whatsapp.smb.message.echoes`), el asistente se calla 30 minutos en esa conversación.
 
 ## Conectar WhatsApp directo con Meta (alternativa)
 
@@ -68,10 +69,11 @@ El token temporal de Meta vence en 24 horas; para dejarlo fijo se crea un usuari
 
 ## Lo que falta para operar de verdad
 
-- **Inventario real.** Las existencias son simuladas en el navegador. Falta conectar Siigo.
+- **Inventario real.** No hay existencias: todo está disponible salvo lo que la tienda marque como agotado en el panel. Falta conectar Siigo.
+- **Audios.** El asistente no entiende notas de voz; responde pidiendo que escriban. Requiere un servicio de transcripción aparte.
 - **WhatsApp.** El canal está construido pero sin probar con Meta: falta la app, el número real y la verificación del negocio. Por WhatsApp no hay existencias: solo se excluye lo marcado como agotado en el panel.
-- **Pago.** El asistente lee el comprobante y la tienda lo confirma a mano. No hay verificación contra Nequi ni el banco.
-- **Costo de domicilio y cobertura.** Los $2.000 por debajo de $20.000 son un valor de ejemplo.
+- **Pago.** Contraentrega (el asistente pregunta con qué billete pagan y calcula la devuelta) o transferencia (lee el comprobante y la tienda lo confirma a mano). No hay verificación contra el banco.
+- **Cobertura y horario.** El domicilio cuesta $2.000 en todo pedido; falta definir la zona de cobertura y la hora de apertura.
 - **Categorías.** Los productos que estaban en "Otros" se clasificaron automáticamente por nombre; conviene revisarlos.
 - **Fotos.** Cinco fotos de categoría son de referencia (Unsplash) y solo 598 productos tienen foto.
 - **Tope de gasto.** El límite de mensajes del chat es aproximado; el tope duro se configura en la consola de Anthropic.

@@ -389,7 +389,7 @@ input { font: inherit; color: inherit; }
         </div>
       </div>
       <div class="hero__sello" aria-hidden="true">
-        <svg viewBox="0 0 200 200"><defs><path id="circulo" d="M100,100 m-84,0 a84,84 0 1,1 168,0 a84,84 0 1,1 -168,0"/></defs><text><textPath href="#circulo">DOMI EN 10 MINUTOS · GRATIS DESDE $20.000 · NEQUI ·</textPath></text></svg>
+        <svg viewBox="0 0 200 200"><defs><path id="circulo" d="M100,100 m-84,0 a84,84 0 1,1 168,0 a84,84 0 1,1 -168,0"/></defs><text><textPath href="#circulo">DOMI EN 10 MINUTOS · PAGA AL RECIBIR O TRANSFIERE ·</textPath></text></svg>
         <img src="logo.png" alt="">
       </div>
     </section>
@@ -427,13 +427,13 @@ input { font: inherit; color: inherit; }
       <div class="cifras">
         <div class="cifra"><strong data-cuenta="10">10</strong><span>minutos máximo, después del pago</span></div>
         <div class="cifra"><strong data-cuenta="1764">1.764</strong><span>productos en la tienda</span></div>
-        <div class="cifra"><strong data-cuenta="20000" data-prefijo="$">$20.000</strong><span>y el domicilio sale gratis</span></div>
+        <div class="cifra"><strong data-cuenta="2000" data-prefijo="$">$2.000</strong><span>el domicilio, en cualquier pedido</span></div>
       </div>
       <div class="pasos">
         <div class="camino" aria-hidden="true"><span>Sauko, local 23</span><span class="domi" id="domi">el domi</span><span>tu puerta</span></div>
         <div class="pasos__lista">
           <div><small>Paso 1</small><b>Pedís por el chat</b><p>El asistente busca, te dice el precio y arma el pedido.</p></div>
-          <div><small>Paso 2</small><b>Pagás y mandás la foto</b><p>Nequi o transferencia. Con el comprobante, la tienda confirma.</p></div>
+          <div><small>Paso 2</small><b>Pagás como prefieras</b><p>Contraentrega en efectivo, o por transferencia mandando la foto del comprobante.</p></div>
           <div><small>Paso 3</small><b>¡Ve, llego!</b><p>Alistamos y sale el domi. Máximo 10 minutos hasta tu puerta.</p></div>
         </div>
       </div>
@@ -446,7 +446,7 @@ input { font: inherit; color: inherit; }
       </div>
       <div class="local__lista">
         <article class="fila"><div><h3>Local 23</h3><small>Hacienda Kachipay</small></div><p>Cl 60A #119C-84, Villa Fátima, Cali</p><p>Abierto hasta las 10 p.m.</p><button class="btn btn--dark" type="button" data-abrir-chat>Pedir aquí</button></article>
-        <article class="fila"><div><h3>WhatsApp</h3><small>Pedidos y domicilios</small></div><p>312 452 9879</p><p>Nequi o transferencia</p><a class="btn btn--dark" href="https://wa.me/573124529879">Escribir</a></article>
+        <article class="fila"><div><h3>WhatsApp</h3><small>Pedidos y domicilios</small></div><p>312 452 9879</p><p>Contraentrega o transferencia</p><a class="btn btn--dark" href="https://wa.me/573124529879">Escribir</a></article>
         <article class="fila"><div><h3>Instagram</h3><small>Novedades y antojos</small></div><p>@sauko.store</p><p>Productos de temporada</p><a class="btn btn--dark" href="https://www.instagram.com/sauko.store/">Ver perfil</a></article>
       </div>
     </section>
@@ -591,11 +591,11 @@ input { font: inherit; color: inherit; }
     </div>
 
     <div class="vista" id="pest-inventario" hidden>
-      <p class="intro">Marca un producto como agotado y deja de ofrecerse en la página y en el chat al instante. Las existencias son simuladas hasta conectar Siigo.</p>
+      <p class="intro">Marca un producto como agotado y deja de ofrecerse en la página, en el chat y por WhatsApp al instante. Las cantidades en existencia llegan cuando se conecte Siigo.</p>
       <input class="campo" id="inv-q" type="search" placeholder="Buscar producto o código" aria-label="Buscar en inventario">
       <div class="caja tabla-caja">
         <table>
-          <thead><tr><th>Producto</th><th>Código</th><th>Categoría</th><th class="n">Precio</th><th class="n">Estantería</th><th class="n">Bodega</th><th>Disponibilidad</th></tr></thead>
+          <thead><tr><th>Producto</th><th>Código</th><th>Categoría</th><th class="n">Precio</th><th>Disponibilidad</th></tr></thead>
           <tbody id="inv-filas"></tbody>
         </table>
       </div>
@@ -687,21 +687,19 @@ document.addEventListener('click', e => {
   if (a) { e.preventDefault(); const sel = a.getAttribute('href'); if (vistaActual !== 'tienda') verVista('tienda', () => irA(sel)); else irA(sel); }
 });
 
-/* ---------- catálogo e inventario simulado ---------- */
+/* ---------- catálogo ---------- */
+// No hay existencias todavía (llegan con Siigo): un producto está disponible mientras la tienda
+// no lo marque como agotado en el panel.
+const MAX_POR_PRODUCTO = 99;
 let CAT = [], TYPES = [], BY_SKU = new Map();
-function rng(seedStr) { let a = 2166136261; for (const ch of seedStr) { a ^= ch.charCodeAt(0); a = Math.imul(a, 16777619); }
-  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 function loadCatalog(data) {
   TYPES = data.types;
-  const todos = data.rows.map(([sku, name, price, t, foto]) => {
-    const r = rng(sku + name), est = r() < 0.07 ? 0 : 1 + Math.floor(r() * 18);
-    return { sku, name, price, type: TYPES[t], ti: t, foto: !!foto, n: norm(name), tok: norm(name).split(' '), est, bod: Math.floor(r() * 24) };
-  });
+  const todos = data.rows.map(([sku, name, price, t, foto]) => ({ sku, name, price, type: TYPES[t], ti: t, foto: !!foto, n: norm(name), tok: norm(name).split(' ') }));
   for (const p of todos) if (!BY_SKU.has(p.sku)) BY_SKU.set(p.sku, p);
   CAT = [...BY_SKU.values()]; CAT = [...CAT.filter(p => p.type !== 'Otros'), ...CAT.filter(p => p.type === 'Otros')];
 }
 let AGOTADOS = {};
-const avail = p => AGOTADOS[p.sku] ? 0 : p.est + p.bod;
+const avail = p => AGOTADOS[p.sku] ? 0 : MAX_POR_PRODUCTO;
 function search(q, k = 8, pool = CAT) {
   const qt = norm(q).split(' ').filter(Boolean).map(t => t.length > 4 && t.endsWith('s') ? t.slice(0, -1) : t);
   if (!qt.length) return [];
@@ -750,15 +748,17 @@ const STEPS = [['armando', 'Armando'], ['esperando_pago', 'Esperando pago'], ['p
 const CLOSED = ['por_confirmar', 'alistando', 'en_camino', 'entregado'];
 const NEXT = { por_confirmar: ['alistando', 'esperando_pago'], alistando: ['en_camino'], en_camino: ['entregado'] };
 let order;
-function newOrder() { const t = Date.now(); order = { id: 'p' + t.toString(36) + Math.random().toString(36).slice(2, 10), no: 1000 + Math.floor(t / 1000) % 9000, items: [], direccion: '', pago: '', status: 'armando', proof: '', proofMonto: 0, rechazo: 0, hora: t, saved: false }; }
+function newOrder() { const t = Date.now(); order = { id: 'p' + t.toString(36) + Math.random().toString(36).slice(2, 10), no: 1000 + Math.floor(t / 1000) % 9000, items: [], direccion: '', pago: '', pagaCon: 0, status: 'armando', proof: '', proofMonto: 0, rechazo: 0, hora: t, saved: false }; }
 newOrder();
+// Lo que la página necesita del negocio (/api/config). El domicilio cuesta lo mismo en todo pedido.
+let NEGOCIO = { costoDomicilio: 2000, datosTransferencia: '' };
 function totals(items) {
   const subtotal = items.reduce((s, i) => s + i.qty * (i.price != null ? i.price : BY_SKU.get(i.sku).price), 0);
-  const domicilio = subtotal === 0 || subtotal >= 20000 ? 0 : 2000;
+  const domicilio = subtotal === 0 ? 0 : NEGOCIO.costoDomicilio;
   return { subtotal, domicilio, total: subtotal + domicilio };
 }
 function snapshot(o) {
-  return { id: o.id, no: o.no, canal: 'Web', direccion: o.direccion, pago: o.pago, status: o.status, total: totals(o.items).total, proof: o.proof, proofMonto: o.proofMonto, rechazo: o.rechazo, hora: o.hora,
+  return { id: o.id, no: o.no, canal: 'Web', direccion: o.direccion, pago: o.pago, pagaCon: o.pagaCon, status: o.status, total: totals(o.items).total, proof: o.proof, proofMonto: o.proofMonto, rechazo: o.rechazo, hora: o.hora,
     items: o.items.map(i => { const p = BY_SKU.get(i.sku); return { sku: i.sku, name: p.name, price: p.price, qty: i.qty }; }) };
 }
 const SHOP_MSG = { alistando: o => 'Pago confirmado. Ya estamos alistando tu pedido #' + o.no + ' y llega en máximo 10 minutos.',
@@ -794,7 +794,7 @@ function renderOrder() {
     const menos = h('button', { type: 'button', 'aria-label': 'Quitar uno', disabled: !open }, '−'), mas = h('button', { type: 'button', 'aria-label': 'Agregar uno', disabled: !open }, '+');
     menos.onclick = () => setQty(i.sku, i.qty - 1); mas.onclick = () => setQty(i.sku, i.qty + 1);
     return h('div', { class: 'pedido__linea' }, h('span', null, p.name), h('span', { class: 'cant num' }, menos, String(i.qty), mas), h('span', { class: 'num' }, pesos(i.qty * p.price))); }));
-  $('pedido-meta').textContent = units ? 'Domicilio: ' + (t.domicilio ? pesos(t.domicilio) : 'gratis') + ' · Entrega: ' + (order.direccion || 'por confirmar') + ' · Pago: ' + (order.pago || 'por confirmar') : 'Toca el más en un producto o pídelo por aquí.';
+  $('pedido-meta').textContent = units ? 'Domicilio: ' + pesos(t.domicilio) + ' · Entrega: ' + (order.direccion || 'por confirmar') + ' · Pago: ' + (order.pago || 'por confirmar') : 'Toca el más en un producto o pídelo por aquí.';
   const idx = order.status === 'entregado' ? STEPS.length : STEPS.findIndex(s => s[0] === order.status);
   $('etapas').replaceChildren(...STEPS.map(([, label], i) => h('div', { class: 'etapa ' + (i < idx ? 'hecha' : i === idx ? 'ahora' : '') }, label)));
   pintarEstado();
@@ -900,15 +900,15 @@ async function shrink(file, lado = 480) {
 }
 const TOOLS = [
   { name: 'buscar_productos',
-    description: 'Busca en el catálogo de Sauko Store por palabras clave (marca, producto, tamaño). Devuelve hasta 8 productos con sku, nombre, precio en COP y unidades disponibles. Úsala antes de mencionar cualquier producto o precio.',
+    description: 'Busca en el catálogo de Sauko Store por palabras clave (marca, producto, tamaño). Devuelve hasta 8 productos con sku, nombre, precio en COP y si está disponible. Úsala antes de mencionar cualquier producto o precio.',
     inputSchema: { type: 'object', properties: { consulta: { type: 'string', description: 'Palabras clave, por ejemplo "coca cola 1.5"' } }, required: ['consulta'] },
     execute(input) { const q = String(input.consulta || ''), res = search(q); log('Buscó "' + q + '" en el catálogo: ' + res.length + ' resultado' + (res.length === 1 ? '' : 's'));
-      return res.map(p => ({ sku: p.sku, nombre: p.name, precio: p.price, disponibles: avail(p) })); } },
+      return res.map(p => ({ sku: p.sku, nombre: p.name, precio: p.price, disponible: avail(p) > 0 })); } },
   { name: 'guardar_pedido',
     description: 'Reemplaza el pedido completo del cliente con la lista de items dada (estado absoluto, no incremental) y opcionalmente guarda dirección y método de pago. Devuelve el pedido con subtotal, domicilio, total y problemas de existencias.',
     inputSchema: { type: 'object', properties: {
       items: { type: 'array', items: { type: 'object', properties: { sku: { type: 'string' }, cantidad: { type: 'integer' } }, required: ['sku', 'cantidad'] } },
-      direccion: { type: 'string', description: 'Conjunto o unidad, torre y apartamento o casa' }, metodo_pago: { type: 'string', enum: ['Nequi', 'Transferencia'] } }, required: ['items'] },
+      direccion: { type: 'string', description: 'Conjunto o unidad, torre y apartamento o casa' }, metodo_pago: { type: 'string', enum: ['Transferencia', 'Contraentrega'] } }, required: ['items'] },
     execute(input) {
       if (CLOSED.includes(order.status)) newOrder();
       const problemas = [], items = [];
@@ -917,25 +917,34 @@ const TOOLS = [
         if (!p) { problemas.push('SKU ' + it.sku + ' no existe; búscalo de nuevo'); continue; }
         if (!(qty > 0)) continue;
         if (avail(p) === 0) { problemas.push(p.name + ': agotado'); continue; }
-        if (qty > avail(p)) { problemas.push(p.name + ': solo hay ' + avail(p) + ', se ajustó la cantidad'); qty = avail(p); }
-        items.push({ sku: p.sku, qty });
+        items.push({ sku: p.sku, qty: Math.min(qty, MAX_POR_PRODUCTO) });
       }
       order.items = items; order.status = 'armando';
       if (input.direccion) order.direccion = String(input.direccion).slice(0, 160);
-      if (input.metodo_pago) order.pago = String(input.metodo_pago).slice(0, 40);
+      if (['Transferencia', 'Contraentrega'].includes(input.metodo_pago)) order.pago = input.metodo_pago;
       renderOrder(); sync(); $('pedido-caja').open = true;
       const t = totals(items); log('Actualizó el pedido #' + order.no + ': ' + items.reduce((s, i) => s + i.qty, 0) + ' unidades, total ' + pesos(t.total));
       return { items: items.map(i => { const p = BY_SKU.get(i.sku); return { sku: i.sku, nombre: p.name, cantidad: i.qty, precio: p.price }; }), ...t, direccion: order.direccion || null, metodo_pago: order.pago || null, problemas };
     } },
-  { name: 'pedir_pago',
-    description: 'Cierra el pedido y lo deja esperando el comprobante. Úsala solo cuando el cliente confirmó productos, dirección y método de pago. Devuelve el total a cobrar.',
-    execute() {
-      const falta = []; if (!order.items.length) falta.push('productos'); if (!order.direccion) falta.push('dirección'); if (!order.pago) falta.push('método de pago');
+  { name: 'cerrar_pedido',
+    description: 'Cierra el pedido cuando el cliente confirmó productos, dirección y forma de pago. Con Transferencia lo deja esperando el comprobante y devuelve los datos de la cuenta. Con Contraentrega lo envía a la tienda para alistar y devuelve la devuelta; exige paga_con.',
+    inputSchema: { type: 'object', properties: { paga_con: { type: 'integer', description: 'Solo Contraentrega: valor en COP del billete o efectivo con que paga el cliente' } } },
+    execute(input) {
+      const falta = []; if (!order.items.length) falta.push('productos'); if (!order.direccion) falta.push('dirección'); if (!order.pago) falta.push('forma de pago (Transferencia o Contraentrega)');
       if (falta.length) throw new Error('Falta: ' + falta.join(', '));
       if (CLOSED.includes(order.status)) throw new Error('Ese pedido ya está en la tienda');
+      const total = totals(order.items).total;
+      if (order.pago === 'Contraentrega') {
+        const billete = Math.floor(Number(input.paga_con) || 0);
+        if (billete < total) throw new Error('Falta saber con cuánto paga el cliente; debe ser al menos ' + total + '. Pregúntale con qué billete paga.');
+        order.pagaCon = billete; order.status = 'alistando'; renderOrder(); sync();
+        log('Cerró el pedido #' + order.no + ' contraentrega: paga con ' + pesos(billete) + ', devuelta ' + pesos(billete - total));
+        return { total, paga_con: billete, devuelta: billete - total, siguiente: 'El pedido ya está en la tienda para alistar. Confírmale al cliente el total, que paga al recibir y cuánta devuelta le lleva el domi. Llega en máximo 10 minutos.' };
+      }
       order.status = 'esperando_pago'; renderOrder(); sync();
-      const t = totals(order.items); log('Pidió el pago de ' + pesos(t.total) + ' por ' + order.pago + ' (pedido #' + order.no + ')');
-      return { total: t.total, instruccion: 'Pide la foto del comprobante de ' + order.pago + ' a nombre de Sauko Store con el botón de la cámara. No inventes números de cuenta: di que la tienda se los comparte por este chat.' };
+      log('Pidió la transferencia de ' + pesos(total) + ' (pedido #' + order.no + ')');
+      const datos = NEGOCIO.datosTransferencia;
+      return { total, datos_para_transferir: datos || null, siguiente: datos ? 'Dale al cliente esos datos tal cual y pídele la foto del comprobante con el botón de la cámara.' : 'Aún no tienes los datos de la cuenta: dile que la tienda se los comparte por este chat y pídele la foto del comprobante cuando pague. No inventes números de cuenta.' };
     } },
   { name: 'registrar_comprobante',
     description: 'Registra el comprobante de pago que el cliente envió como imagen en este mensaje. Indica si la imagen es un comprobante legible y el monto que muestra. Devuelve si quedó recibido para que la tienda lo confirme.',
@@ -974,9 +983,13 @@ async function sampleApi(turnos, opts) {
     let d;
     try { d = await pedir('/api/chat', { method: 'POST', body: JSON.stringify({ mensajes }) }); }
     catch (e) { throw { code: e.status === 429 ? 'rate_limited' : e.status === 503 ? 'not_granted' : 'upstream_error', text: texto || undefined }; }
-    const parte = d.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
-    if (parte) { texto += (texto ? '\n\n' : '') + parte; if (opts.onText) opts.onText({ text: texto }); }
-    if (d.stop_reason !== 'tool_use') break;
+    // Solo se muestra el texto de la última ronda: lo que el modelo escribe antes de usar una
+    // herramienta suele ser una nota para sí mismo.
+    if (d.stop_reason !== 'tool_use') {
+      texto = d.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+      if (texto && opts.onText) opts.onText({ text: texto });
+      break;
+    }
     const resultados = await Promise.all(d.content.filter(b => b.type === 'tool_use').map(async uso => {
       const herramienta = TOOLS.find(t => t.name === uso.name);
       try { if (!herramienta) throw new Error('Herramienta desconocida'); const salida = await herramienta.execute(uso.input || {}); return { type: 'tool_result', tool_use_id: uso.id, content: typeof salida === 'string' ? salida : JSON.stringify(salida) }; }
@@ -1068,19 +1081,22 @@ function tarjeta(o) {
   el.append(h('p', null, h('b', null, 'Entrega: '), String(o.direccion || '')));
   const picking = o.status === 'alistando', set = picked.get(o.id) || new Set();
   el.append(h('ul', null, ...items.map((i, k) => { const p = BY_SKU.get(i.sku);
-    const txt = h('span', null, i.qty + ' × ' + i.name, h('small', null, (p ? (p.est >= i.qty ? 'Estantería' : 'Bodega de la tienda') + ' · ' : '') + i.sku));
+    const txt = h('span', null, i.qty + ' × ' + i.name, h('small', null, (p ? p.type + ' · ' : '') + i.sku));
     if (!picking) return h('li', null, txt);
     const cb = h('input', { type: 'checkbox', id: 'pick-' + o.id + '-' + k, checked: set.has(i.sku) });
     cb.onchange = () => { cb.checked ? set.add(i.sku) : set.delete(i.sku); picked.set(o.id, set); renderPanel(); };
     return h('li', null, h('label', null, cb, txt)); })));
   el.append(h('div', { class: 'total' }, h('span', null, 'Total · ' + String(o.pago || '')), h('span', { class: 'num' }, pesos(o.total || 0))));
+  // Contraentrega: el domiciliario cobra al entregar y lleva la devuelta lista.
+  if (o.pago === 'Contraentrega') el.append(h('div', { class: 'comprobante' }, h('div', null, h('div', null, 'Cobrar ', h('b', { class: 'num' }, pesos(o.total || 0)), ' al entregar'),
+    h('div', null, 'Paga con ', h('b', { class: 'num' }, pesos(o.pagaCon || 0)), ' · llevar devuelta de ', h('b', { class: 'num' }, pesos(Math.max(0, (o.pagaCon || 0) - (o.total || 0))))))));
   const acts = h('div', { class: 'acciones' });
   if (o.status === 'por_confirmar') {
     const covers = (o.proofMonto || 0) >= (o.total || 0);
     el.append(h('div', { class: 'comprobante' }, o.proof && String(o.proof).startsWith('data:image/') ? h('img', { src: o.proof, alt: 'Comprobante enviado por el cliente' }) : null,
       h('div', null, h('div', null, 'El asistente leyó ', h('b', { class: 'num' }, pesos(o.proofMonto || 0))), h('span', { class: 'chip ' + (covers ? 'chip--ok' : 'chip--mal') }, covers ? 'Cubre el total' : 'No cubre el total'))));
     const yes = h('button', { class: 'btn btn--morado', type: 'button' }, 'Confirmar pago'), no = h('button', { class: 'btn btn--peligro', type: 'button' }, 'Rechazar');
-    yes.onclick = () => { for (const i of items) { const p = BY_SKU.get(i.sku); if (p) { const a = Math.min(p.est, i.qty); p.est -= a; p.bod = Math.max(0, p.bod - (i.qty - a)); } } act(o, { status: 'alistando' }); };
+    yes.onclick = () => act(o, { status: 'alistando' });
     no.onclick = () => act(o, { status: 'esperando_pago', rechazo: Date.now(), proof: '', proofMonto: 0 });
     acts.append(yes, no);
   } else if (picking) {
@@ -1099,6 +1115,25 @@ function barras(id, filas, formato) {
     : [h('p', { class: 'vacio' }, 'Todavía no hay ventas confirmadas.')]));
 }
 function agrupar(lista, clave, valor) { const m = new Map(); for (const x of lista) m.set(clave(x), (m.get(clave(x)) || 0) + valor(x)); return [...m.entries()].sort((a, b) => b[1] - a[1]); }
+// Aviso de pedido nuevo: suena y cambia el título de la pestaña cuando entra algo por atender.
+const POR_ATENDER = ['por_confirmar', 'alistando'];
+let yaAvisados = null, audio = null;
+function sonar() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.22, 0.44].forEach((cuando, i) => { const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + cuando;
+      o.frequency.value = i === 2 ? 1175 : 880; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+      o.connect(g).connect(audio.destination); o.start(t); o.stop(t + 0.2); });
+  } catch (e) {}
+}
+function avisarNuevos(lista) {
+  const llaves = lista.filter(o => POR_ATENDER.includes(o.status)).map(o => o.id + ':' + o.status);
+  // La primera carga no suena: son pedidos que ya estaban.
+  if (yaAvisados && llaves.some(k => !yaAvisados.has(k))) sonar();
+  yaAvisados = new Set(llaves);
+  const pendientes = lista.filter(o => o.status === 'por_confirmar').length + lista.filter(o => o.status === 'alistando').length;
+  document.title = (pendientes ? '(' + pendientes + ') ' : '') + 'Sauko Store · ' + (vistaActual === 'panel' ? 'Panel' : 'Minimarket a domicilio');
+}
 function renderPanel() {
   const de = st => panelOrders.filter(o => o.status === st).sort((a, b) => a.hora - b.hora);
   $('tablero').replaceChildren(...COLS.map(([st, title, empty]) => { const list = de(st);
@@ -1107,7 +1142,7 @@ function renderPanel() {
   $('entregados').replaceChildren(...(entregados.length ? entregados.map(tarjeta) : [h('p', { class: 'vacio' }, 'Todavía no hay entregas.')]));
   $('n-entregados').textContent = entregados.length; $('limpiar').hidden = !entregados.length;
   $('k-confirmar').textContent = de('por_confirmar').length; $('k-alistando').textContent = de('alistando').length; $('k-camino').textContent = de('en_camino').length;
-  $('t-pedidos').textContent = de('por_confirmar').length;
+  $('t-pedidos').textContent = de('por_confirmar').length + de('alistando').length;
   const vendidos = panelOrders.filter(o => VENDIDO.includes(o.status)), ventas = vendidos.reduce((s, o) => s + (o.total || 0), 0);
   const lineas = vendidos.flatMap(o => Array.isArray(o.items) ? o.items : []);
   $('k-ventas').textContent = pesos(ventas); $('r-ventas').textContent = pesos(ventas); $('r-pedidos').textContent = vendidos.length;
@@ -1130,7 +1165,7 @@ function renderInv() {
   $('inv-filas').replaceChildren(...(lista.length ? lista.map(p => { const ag = !!AGOTADOS[p.sku];
     const b = h('button', { class: 'mini' + (ag ? ' is-agotado' : ''), type: 'button' }, ag ? 'Agotado · reactivar' : 'Marcar agotado');
     b.onclick = () => { const mapa = { ...AGOTADOS }; if (ag) delete mapa[p.sku]; else mapa[p.sku] = true; store.setAgotados(mapa).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); };
-    return h('tr', null, h('td', null, p.name), h('td', { class: 'num' }, p.sku), h('td', null, p.type), h('td', { class: 'n' }, pesos(p.price)), h('td', { class: 'n' }, String(p.est)), h('td', { class: 'n' }, String(p.bod)), h('td', null, b)); })
+    return h('tr', null, h('td', null, p.name), h('td', { class: 'num' }, p.sku), h('td', null, p.type), h('td', { class: 'n' }, pesos(p.price)), h('td', null, b)); })
     : [h('tr', null, h('td', { colSpan: 7, class: 'vacio' }, 'Ningún producto coincide con esa búsqueda.'))]));
   const n = Object.keys(AGOTADOS).length; $('t-agotados').hidden = !n; $('t-agotados').textContent = n;
 }
@@ -1142,7 +1177,7 @@ function estEstado(siigo, visto) { const d = siigo - visto; if (visto > siigo) r
 function renderEst() {
   $('est-filas').replaceChildren(...estItems.map((it, i) => { const p = it.sku ? BY_SKU.get(it.sku) : null;
     const sel = h('select', { id: 'est-sel-' + i, 'aria-label': 'Producto en catálogo' }, h('option', { value: '' }, 'Sin coincidencia'), ...it.opts.map(o => h('option', { value: o.sku, selected: o.sku === it.sku }, o.name)));
-    sel.onchange = () => { it.sku = sel.value; it.siigo = sel.value ? BY_SKU.get(sel.value).est : 0; renderEst(); };
+    sel.onchange = () => { it.sku = sel.value; renderEst(); };
     const inp = h('input', { type: 'number', min: 0, id: 'est-n-' + i, value: it.siigo, 'aria-label': 'Existencia en Siigo' });
     inp.onchange = () => { it.siigo = Math.max(0, Number(inp.value) || 0); renderEst(); };
     const [cls, label] = p ? estEstado(it.siigo, it.visto) : ['chip--mal', 'Sin código'];
@@ -1161,7 +1196,7 @@ $('est-analizar').onclick = async () => {
     const data = await pedir('/api/estanteria', { method: 'POST', body: JSON.stringify({ imagen }) });
     const lista = Array.isArray(data && data.productos) ? data.productos : [];
     estItems = lista.slice(0, 40).map(x => { const opts = search(String(x.busqueda || x.nombre || ''), 5), top = opts[0];
-      return { nombre: String(x.nombre || 'Producto'), visto: Math.max(0, Math.floor(Number(x.unidades_visibles) || 0)), conf: String(x.confianza || ''), opts, sku: top ? top.sku : '', siigo: top ? top.est : 0 }; });
+      return { nombre: String(x.nombre || 'Producto'), visto: Math.max(0, Math.floor(Number(x.unidades_visibles) || 0)), conf: String(x.confianza || ''), opts, sku: top ? top.sku : '', siigo: 0 }; });
     $('est-marca').textContent = 'Tu foto'; renderEst();
     const contar = estItems.filter(it => it.sku && estEstado(it.siigo, it.visto)[1] === 'Contar a mano').length;
     $('est-estado').textContent = (lista.length ? lista.length + ' productos reconocidos, ' + contar + ' para contar a mano. ' : 'No se reconocieron productos en la foto. ') + String((data && data.observaciones) || '');
@@ -1226,12 +1261,13 @@ function animar() {
 /* ---------- arranque ---------- */
 renderPanel(); renderOrder();
 if (hayGsap && !sinMovimiento) animar();
+fetch('/api/config').then(r => r.json()).then(c => { if (c && Number(c.costoDomicilio) >= 0) NEGOCIO = { costoDomicilio: Number(c.costoDomicilio), datosTransferencia: String(c.datosTransferencia || '') }; renderOrder(); }).catch(() => {});
 fetch('catalog.json').then(r => r.json()).then(d => {
   loadCatalog(d); armarTienda(); renderOrder(); renderPanel(); renderInv(); estEjemplo();
   if (hayGsap && !sinMovimiento) { gsap.from('.acceso', { y: 50, opacity: 0, duration: 0.6, stagger: 0.05, ease: 'power3.out', clearProps: 'all', scrollTrigger: { trigger: '#cat-accesos', start: 'top 88%' } }); ScrollTrigger.refresh(); }
   const vista = location.hash.slice(1); if (vista === 'panel' || vista === 'carta') verVista(vista);
 }).catch(() => { $('cat-accesos').replaceChildren(h('p', null, 'No se pudo cargar el catálogo. Recarga la página.')); });
-storeReady.then(s => { store = s; s.all(list => { panelOrders = list; renderPanel(); });
+storeReady.then(s => { store = s; s.all(list => { panelOrders = list; avisarNuevos(list); renderPanel(); });
   s.agotados(mapa => { AGOTADOS = mapa || {}; pintarEstado(); renderInv(); });
   if (vistaActual === 'panel') s.traerPedidos(); });
 </script>
