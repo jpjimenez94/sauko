@@ -574,6 +574,7 @@ input { font: inherit; color: inherit; }
     <button role="tab" aria-selected="true" data-pest="pedidos">Pedidos <span class="cuenta num" id="t-pedidos">0</span></button>
     <button role="tab" aria-selected="false" data-pest="resumen">Resumen</button>
     <button role="tab" aria-selected="false" data-pest="inventario">Inventario <span class="cuenta num" id="t-agotados" hidden>0</span></button>
+    <button role="tab" aria-selected="false" data-pest="solicitados">Solicitados <span class="cuenta num" id="t-solicitados" hidden>0</span></button>
     <button role="tab" aria-selected="false" data-pest="estanteria">Estantería</button>
     <button role="tab" aria-selected="false" data-pest="ajustes" data-solo-admin hidden>Ajustes</button>
     <button role="tab" aria-selected="false" data-pest="usuarios" data-solo-admin hidden>Usuarios</button>
@@ -647,6 +648,17 @@ input { font: inherit; color: inherit; }
         </table>
       </div>
       <p class="vacio">La columna Siigo es editable: escribe la existencia real para ver la diferencia. La IA no ve las filas de atrás.</p>
+    </div>
+
+    <div class="vista" id="pest-solicitados" hidden>
+      <p class="intro">Productos que los clientes pidieron por el chat o por WhatsApp y que no están en el catálogo. Sirve para decidir qué traer. Cuando ya lo tengas o no te interese, quítalo de la lista.</p>
+      <div class="caja tabla-caja">
+        <table>
+          <thead><tr><th>Producto pedido</th><th class="n">Veces</th><th>Última vez</th><th>Canal</th><th></th></tr></thead>
+          <tbody id="sol-filas"></tbody>
+        </table>
+      </div>
+      <p class="vacio" id="sol-estado" role="status"></p>
     </div>
 
     <div class="vista" id="pest-ajustes" hidden>
@@ -1016,6 +1028,11 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: { consulta: { type: 'string', description: 'Palabras clave, por ejemplo "coca cola 1.5"' } }, required: ['consulta'] },
     execute(input) { const q = String(input.consulta || ''), res = search(q); log('Buscó "' + q + '" en el catálogo: ' + res.length + ' resultado' + (res.length === 1 ? '' : 's'));
       return res.map(p => ({ sku: p.sku, nombre: p.name, precio: p.price, disponible: avail(p) > 0 })); } },
+  { name: 'anotar_producto_faltante',
+    description: 'Anota un producto que el cliente pidió y que no existe en el catálogo, para que la tienda lo vea en su panel y decida si lo trae. Úsala solo después de buscarlo sin encontrarlo.',
+    inputSchema: { type: 'object', properties: { producto: { type: 'string', description: 'Marca, producto y tamaño como lo pidió el cliente, por ejemplo "Leche de almendras Silk 946 ml"' } }, required: ['producto'] },
+    async execute(input) { const producto = String(input.producto || '').slice(0, 80); log('Anotó un producto que no tenemos: ' + producto);
+      return pedir('/api/solicitados', { method: 'POST', body: JSON.stringify({ producto }) }).catch(() => ({ anotado: false })); } },
   { name: 'guardar_pedido',
     description: 'Reemplaza el pedido completo del cliente con la lista de items dada (estado absoluto, no incremental) y opcionalmente guarda dirección y método de pago. Devuelve el pedido con subtotal, domicilio, total y problemas de existencias.',
     inputSchema: { type: 'object', properties: {
@@ -1203,7 +1220,7 @@ function sesionAbierta(usuario) {
   for (const f of ['login-form', 'primer-form']) $(f).reset();
   $('login-error').textContent = ''; $('primer-error').textContent = '';
   if (store) store.traerPedidos();
-  cargarAjustes();
+  cargarAjustes(); cargarSolicitados();
 }
 async function revisarSesion() {
   try { sesionAbierta((await pedir('/api/sesion')).usuario); }
@@ -1308,6 +1325,20 @@ function verPestana(nombre) {
   document.querySelectorAll('.vista[id^="pest-"]').forEach(v => { v.hidden = v.id !== 'pest-' + nombre; });
   if (nombre === 'usuarios') cargarUsuarios();
   if (nombre === 'ajustes') cargarAjustes();
+  if (nombre === 'solicitados') cargarSolicitados();
+}
+
+/* Solicitados: lo que piden los clientes y no está en el catálogo */
+function cargarSolicitados() {
+  return pedir('/api/solicitados').then(d => {
+    const lista = d.solicitados || [];
+    $('t-solicitados').hidden = !lista.length; $('t-solicitados').textContent = lista.length; $('sol-estado').textContent = '';
+    $('sol-filas').replaceChildren(...(lista.length ? lista.map(s => {
+      const quitar = h('button', { class: 'mini', type: 'button' }, 'Quitar');
+      quitar.onclick = () => pedir('/api/solicitados?clave=' + encodeURIComponent(s.clave), { method: 'DELETE' }).then(cargarSolicitados).catch(e => { $('sol-estado').textContent = e.message; });
+      return h('tr', null, h('td', null, s.nombre), h('td', { class: 'n' }, String(s.veces)), h('td', null, new Date(s.ultima).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })), h('td', null, s.canal || ''), h('td', null, quitar));
+    }) : [h('tr', null, h('td', { colSpan: 5, class: 'vacio' }, 'Todavía nadie ha pedido algo que no esté en el catálogo.'))]));
+  }).catch(e => { $('sol-estado').textContent = e.message; });
 }
 document.querySelectorAll('.pestanas button').forEach(b => b.onclick = () => verPestana(b.dataset.pest));
 
