@@ -302,6 +302,9 @@ input { font: inherit; color: inherit; }
 .acceso-pin h2 { font-family: var(--display); font-weight: 800; color: var(--morado-oscuro); font-size: 1.5rem; line-height: 1; }
 .panel.bloqueado .acceso-pin:not([hidden]) { display: grid; }
 .panel.bloqueado .pestanas, .panel.bloqueado main { display: none; }
+.aviso-stock { background: var(--mal-bg); color: var(--mal); border-radius: 16px; padding: 0.8rem 1rem; display: grid; gap: 0.4rem; justify-items: start; font-size: 0.92rem; }
+.aviso-stock .mini { border-color: var(--mal); }
+.panel td input[type=number]::placeholder { font-size: 0.72rem; }
 .quien { font-size: 0.85rem; opacity: 0.85; white-space: nowrap; }
 .formulario { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.8rem; align-items: end; }
 .rotulo { display: grid; gap: 0.25rem; font-size: 0.82rem; font-weight: 700; min-width: 0; }
@@ -592,6 +595,7 @@ input { font: inherit; color: inherit; }
         <div class="kpi"><strong id="k-camino">0</strong><span>En camino</span></div>
         <div class="kpi kpi--ventas"><strong id="k-ventas">$0</strong><span>Vendido en pedidos</span></div>
       </section>
+      <div class="aviso-stock" id="aviso-stock" role="status" hidden></div>
       <p class="intro">El asistente ya armó el pedido y leyó el comprobante. Aquí se confirma el pago, se alista y se despacha; cada toque le avisa al cliente por el chat.</p>
       <div class="tablero" id="tablero"></div>
       <details class="entregados">
@@ -622,11 +626,11 @@ input { font: inherit; color: inherit; }
     </div>
 
     <div class="vista" id="pest-inventario" hidden>
-      <p class="intro">Marca un producto como agotado y deja de ofrecerse en la página, en el chat y por WhatsApp al instante. Las cantidades en existencia llegan cuando se conecte Siigo.</p>
+      <p class="intro">Escribe cuántas unidades hay de un producto y el sistema las va descontando con cada pedido que entra a alistarse. Cuando quedan 1 o 2 te avisa aquí y en Pedidos; al llegar a cero deja de ofrecerse solo. Los productos "sin contar" se venden hasta que los marques agotados. El cliente nunca ve las cantidades.</p>
       <input class="campo" id="inv-q" type="search" placeholder="Buscar producto o código" aria-label="Buscar en inventario">
       <div class="caja tabla-caja">
         <table>
-          <thead><tr><th>Producto</th><th>Código</th><th>Categoría</th><th class="n">Precio</th><th>Disponibilidad</th></tr></thead>
+          <thead><tr><th>Producto</th><th>Código</th><th>Categoría</th><th class="n">Precio</th><th class="n">Unidades</th><th>Disponibilidad</th></tr></thead>
           <tbody id="inv-filas"></tbody>
         </table>
       </div>
@@ -821,7 +825,9 @@ function loadCatalog(data) {
   CAT = [...BY_SKU.values()]; CAT = [...CAT.filter(p => p.type !== 'Otros'), ...CAT.filter(p => p.type === 'Otros')];
 }
 let AGOTADOS = {};
-const avail = p => AGOTADOS[p.sku] ? 0 : MAX_POR_PRODUCTO;
+// TOPES: cuántas unidades se pueden pedir de los productos de los que quedan pocas. No se le muestra al cliente.
+let TOPES = {};
+const avail = p => AGOTADOS[p.sku] ? 0 : Math.min(MAX_POR_PRODUCTO, TOPES[p.sku] || MAX_POR_PRODUCTO);
 function search(q, k = 8, pool = CAT) {
   const qt = norm(q).split(' ').filter(Boolean).map(t => t.length > 4 && t.endsWith('s') ? t.slice(0, -1) : t);
   if (!qt.length) return [];
@@ -850,18 +856,23 @@ async function pedir(url, opciones = {}) {
 function apiStore() {
   const todos = [], propios = [], agotados = [];
   const traerPedidos = () => pedir('/api/orders').then(d => { panelListo(true); todos.forEach(f => f(d.pedidos || [])); }).catch(e => { if (e.status === 401) revisarSesion(); else $('vivo-texto').textContent = 'Sin conexión'; });
-  const traerAgotados = () => pedir('/api/agotados').then(d => agotados.forEach(f => f(d.skus || {}))).catch(() => {});
+  const repartir = d => { TOPES = d.topes || {}; agotados.forEach(f => f(d.skus || {})); if (d.existencias) pintarInventario(d); return d; };
+  const traerAgotados = () => pedir('/api/agotados').then(repartir).catch(() => {});
   // El panel se refresca cada 3 s mientras está abierto; el cliente consulta solo su pedido en curso.
   setInterval(() => { if (vistaActual === 'panel' && panelAbierto) traerPedidos(); }, 3000);
   setInterval(() => { for (const p of propios) if (!p.fin) pedir('/api/orders?id=' + encodeURIComponent(p.id)).then(d => { if (d.pedido) { p.fin = d.pedido.status === 'entregado'; p.fn(d.pedido); } }).catch(() => {}); }, 4000);
   setInterval(traerAgotados, 20000);
+  // El panel refresca las unidades para que el aviso de "por agotarse" salga sin recargar.
+  setInterval(() => { if (vistaActual === 'panel' && panelAbierto) pedir('/api/agotados?panel=1').then(pintarInventario).catch(() => {}); }, 20000);
   return { shared: true, traerPedidos,
     save: o => pedir('/api/orders', { method: 'POST', body: JSON.stringify(o) }),
     patch: (id, cambios) => pedir('/api/orders', { method: 'PATCH', body: JSON.stringify({ id, cambios }) }).then(traerPedidos),
     remove: id => pedir('/api/orders?id=' + encodeURIComponent(id), { method: 'DELETE' }).then(traerPedidos),
     all: fn => { todos.push(fn); }, one: (id, fn) => { propios.push({ id, fn, fin: false }); },
     agotados: fn => { agotados.push(fn); traerAgotados(); },
-    setAgotados: mapa => pedir('/api/agotados', { method: 'POST', body: JSON.stringify({ skus: mapa }) }).then(d => agotados.forEach(f => f(d.skus || {}))) };
+    setAgotados: mapa => pedir('/api/agotados', { method: 'POST', body: JSON.stringify({ skus: mapa }) }).then(repartir),
+    setExistencia: (sku, unidades) => pedir('/api/agotados', { method: 'POST', body: JSON.stringify({ existencia: { sku, unidades } }) }).then(repartir),
+    inventario: () => pedir('/api/agotados?panel=1').then(pintarInventario) };
 }
 const storeReady = Promise.resolve().then(apiStore);
 
@@ -1061,7 +1072,8 @@ const TOOLS = [
         if (!p) { problemas.push('SKU ' + it.sku + ' no existe; búscalo de nuevo'); continue; }
         if (!(qty > 0)) continue;
         if (avail(p) === 0) { problemas.push(p.name + ': agotado'); continue; }
-        items.push({ sku: p.sku, qty: Math.min(qty, MAX_POR_PRODUCTO) });
+        if (qty > avail(p)) problemas.push(p.name + ': solo quedan ' + avail(p) + '; se agregaron ' + avail(p));
+        items.push({ sku: p.sku, qty: Math.min(qty, avail(p)) });
       }
       order.items = items; order.status = 'armando';
       if (input.direccion) order.direccion = String(input.direccion).slice(0, 160);
@@ -1234,7 +1246,7 @@ function sesionAbierta(usuario) {
   YO = usuario; pintarSesion(); verPestana('pedidos'); panelListo(true);
   for (const f of ['login-form', 'primer-form']) $(f).reset();
   $('login-error').textContent = ''; $('primer-error').textContent = '';
-  if (store) store.traerPedidos();
+  if (store) { store.traerPedidos(); store.inventario().catch(() => {}); }
   cargarAjustes(); cargarSolicitados();
 }
 async function revisarSesion() {
@@ -1255,7 +1267,7 @@ $('salir').onclick = () => pedir('/api/sesion', { method: 'DELETE' }).catch(() =
 // Interruptor del asistente de WhatsApp: el administrador lo enciende y lo apaga cuando quiera.
 function pintarWhatsApp(a) { const b = $('wa-interruptor'); b.hidden = false; b.setAttribute('aria-pressed', String(!!a.whatsappActivo)); b.textContent = !a.whatsappConectado ? 'WhatsApp: sin conectar' : a.whatsappActivo ? 'WhatsApp: encendido' : 'WhatsApp: apagado'; b.disabled = !a.whatsappConectado || !YO || YO.rol !== 'admin'; }
 $('wa-interruptor').onclick = () => { const encender = $('wa-interruptor').getAttribute('aria-pressed') !== 'true'; pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ whatsappActivo: encender }) }).then(pintarWhatsApp).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); };
-function act(o, patch) { store.patch(o.id, patch).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); }
+function act(o, patch) { store.patch(o.id, patch).then(() => store.inventario()).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); }
 function tarjeta(o) {
   const el = h('article', { class: 'tarjeta' }), items = Array.isArray(o.items) ? o.items : [];
   el.append(h('div', { class: 'tarjeta__cabeza' }, h('strong', { class: 'n num' }, '#' + o.no), h('small', { class: 'num' }, new Date(o.hora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) + ' · ' + String(o.canal || 'Web') + (o.cliente ? ' +' + String(o.cliente).replace(/^[+]/, '') : ''))));
@@ -1428,15 +1440,39 @@ $('aj-ver-bitacora').onclick = () => pedir('/api/ajustes?bitacora=1').then(d => 
 }).catch(err => { $('aj-bitacora').replaceChildren(h('p', { class: 'vacio' }, err.message)); });
 
 /* Inventario: existencias simuladas y agotados compartidos con la página */
+// INV: lo que solo ve el panel. agotados = marcados a mano; existencias = unidades de los productos que la tienda cuenta.
+let INV = { agotados: {}, existencias: {} };
+const POCAS = 2;
+const sinUnidades = p => INV.existencias[p.sku] != null && INV.existencias[p.sku] <= 0;
+const porAgotarse = p => INV.existencias[p.sku] != null && INV.existencias[p.sku] > 0 && INV.existencias[p.sku] <= POCAS;
+function pintarInventario(d) {
+  INV = { agotados: d.agotados || {}, existencias: d.existencias || {} };
+  renderInv();
+  // Aviso en la pestaña de pedidos: lo que está por agotarse y lo que se quedó sin unidades.
+  const pocos = CAT.filter(porAgotarse), cero = CAT.filter(sinUnidades), caja = $('aviso-stock');
+  caja.hidden = !pocos.length && !cero.length;
+  caja.replaceChildren(...[
+    pocos.length ? h('p', null, h('b', null, 'Por agotarse (' + pocos.length + '): '), pocos.slice(0, 8).map(p => p.name + ' · quedan ' + INV.existencias[p.sku]).join(' · ') + (pocos.length > 8 ? ' y ' + (pocos.length - 8) + ' más' : '')) : null,
+    cero.length ? h('p', null, h('b', null, 'Sin unidades (' + cero.length + '): '), cero.slice(0, 8).map(p => p.name).join(' · ') + (cero.length > 8 ? ' y ' + (cero.length - 8) + ' más' : '')) : null,
+    (() => { const b = h('button', { class: 'mini', type: 'button' }, 'Ver inventario'); b.onclick = () => verPestana('inventario'); return b; })()].filter(Boolean));
+  return d;
+}
 function renderInv() {
   if (!CAT.length) return;
-  const q = $('inv-q').value.trim(), lista = q ? [...new Set([...CAT.filter(p => p.sku.includes(q)).slice(0, 10), ...search(q, 30)])] : [...CAT.filter(p => AGOTADOS[p.sku]), ...CAT.filter(p => !AGOTADOS[p.sku]).slice(0, 30)];
-  $('inv-filas').replaceChildren(...(lista.length ? lista.map(p => { const ag = !!AGOTADOS[p.sku];
-    const b = h('button', { class: 'mini' + (ag ? ' is-agotado' : ''), type: 'button' }, ag ? 'Agotado · reactivar' : 'Marcar agotado');
-    b.onclick = () => { const mapa = { ...AGOTADOS }; if (ag) delete mapa[p.sku]; else mapa[p.sku] = true; store.setAgotados(mapa).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); };
-    return h('tr', null, h('td', null, p.name), h('td', { class: 'num' }, p.sku), h('td', null, p.type), h('td', { class: 'n' }, pesos(p.price)), h('td', null, b)); })
-    : [h('tr', null, h('td', { colSpan: 7, class: 'vacio' }, 'Ningún producto coincide con esa búsqueda.'))]));
-  const n = Object.keys(AGOTADOS).length; $('t-agotados').hidden = !n; $('t-agotados').textContent = n;
+  const q = $('inv-q').value.trim(), agotado = p => !!INV.agotados[p.sku] || sinUnidades(p), contado = p => INV.existencias[p.sku] != null;
+  // Sin búsqueda: primero lo urgente (por agotarse y agotado), luego lo que se está contando y al final el resto.
+  const lista = q ? [...new Set([...CAT.filter(p => p.sku.includes(q)).slice(0, 10), ...search(q, 30)])]
+    : [...CAT.filter(porAgotarse), ...CAT.filter(agotado), ...CAT.filter(p => contado(p) && !porAgotarse(p) && !agotado(p)).slice(0, 60), ...CAT.filter(p => !contado(p) && !agotado(p)).slice(0, 30)];
+  const fallo = () => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; };
+  $('inv-filas').replaceChildren(...(lista.length ? lista.map(p => { const manual = !!INV.agotados[p.sku], unidades = INV.existencias[p.sku];
+    const b = h('button', { class: 'mini' + (manual ? ' is-agotado' : ''), type: 'button' }, manual ? 'Agotado · reactivar' : 'Marcar agotado');
+    b.onclick = () => { const mapa = { ...INV.agotados }; if (manual) delete mapa[p.sku]; else mapa[p.sku] = true; store.setAgotados(mapa).catch(fallo); };
+    const campo = h('input', { type: 'number', min: '0', max: '99999', step: '1', inputMode: 'numeric', placeholder: 'sin contar', value: unidades == null ? '' : String(Math.max(0, unidades)), 'aria-label': 'Unidades de ' + p.name });
+    campo.onchange = () => store.setExistencia(p.sku, campo.value.trim() === '' ? null : Number(campo.value)).catch(fallo);
+    const estado = sinUnidades(p) ? h('span', { class: 'chip chip--mal' }, 'Sin unidades') : porAgotarse(p) ? h('span', { class: 'chip chip--mal' }, unidades === 1 ? 'Queda 1' : 'Quedan ' + unidades) : null;
+    return h('tr', null, h('td', null, p.name), h('td', { class: 'num' }, p.sku), h('td', null, p.type), h('td', { class: 'n' }, pesos(p.price)), h('td', { class: 'n' }, campo), h('td', null, h('div', { class: 'acciones' }, estado, b))); })
+    : [h('tr', null, h('td', { colSpan: 6, class: 'vacio' }, 'Ningún producto coincide con esa búsqueda.'))]));
+  const n = CAT.filter(p => agotado(p) || porAgotarse(p)).length; $('t-agotados').hidden = !n; $('t-agotados').textContent = n;
 }
 $('inv-q').oninput = renderInv;
 
