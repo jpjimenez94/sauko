@@ -70,7 +70,7 @@ El token temporal de Meta vence en 24 horas; para dejarlo fijo se crea un usuari
 ## Lo que falta para operar de verdad
 
 - **Inventario real.** No hay existencias: todo está disponible salvo lo que la tienda marque como agotado en el panel. Falta conectar Siigo.
-- **Audios.** El asistente no entiende notas de voz; responde pidiendo que escriban. Requiere un servicio de transcripción aparte.
+- **Audios.** Con `GROQ_API_KEY`, las notas de voz de WhatsApp se transcriben (Whisper en Groq) y el asistente las atiende. Falta probarlo con un audio real.
 - **WhatsApp.** El canal está construido pero sin probar con Meta: falta la app, el número real y la verificación del negocio. Por WhatsApp no hay existencias: solo se excluye lo marcado como agotado en el panel.
 - **Pago.** Contraentrega (el asistente pregunta con qué billete pagan y calcula la devuelta) o transferencia (lee el comprobante y la tienda lo confirma a mano). No hay verificación contra el banco.
 - **Cobertura y horario.** El domicilio cuesta $2.000 en todo pedido; falta definir la zona de cobertura y la hora de apertura.
