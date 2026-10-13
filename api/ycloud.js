@@ -1,4 +1,4 @@
-import { bajarImagenYCloud, firmaYCloudValida } from "../lib/whatsapp.js";
+import { bajarImagenYCloud, bajarAudioYCloud, firmaYCloudValida } from "../lib/whatsapp.js";
 import { atenderEntrante, cuerpoCrudo } from "../lib/entrada.js";
 import { anotar, pausar } from "../lib/store.js";
 
@@ -56,6 +56,7 @@ export default async function handler(req, res) {
     tipo: m.type,
     texto: m.text?.body ?? m.image?.caption ?? "",
     bajar: () => bajarImagenYCloud(m.image),
+    bajarAudio: () => bajarAudioYCloud(m.audio ?? m.voice),
   });
   // Se responde cuando el asistente termina: si se contesta antes, Vercel corta el trabajo a medias.
   // Si el proveedor reintenta por la demora, el mensaje repetido se descarta.
