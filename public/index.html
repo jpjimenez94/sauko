@@ -280,6 +280,10 @@ input { font: inherit; color: inherit; }
 .columna h2 span { background: var(--sol); border-radius: 999px; padding: 0 0.6rem; font-size: 0.95rem; }
 .tarjeta.tarjeta--toca { border-left-color: var(--mal); box-shadow: 0 0 0 3px var(--mal); }
 .tarjeta.tarjeta--espera { border-left-color: var(--lila); }
+.cancelar { display: grid; gap: 0.5rem; background: var(--mal-bg); border-radius: 12px; padding: 0.8rem; }
+.cancelar select { padding: 0.4rem; border-radius: 8px; border: 1px solid #cfc8de; font: inherit; background: #fff; }
+.cancelar label { display: flex; gap: 0.5rem; align-items: center; font-weight: 700; }
+.cancelar small { opacity: 0.75; }
 .programado { display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; align-items: center; font-size: 0.9rem; }
 .tarjeta--toca .programado b { color: var(--mal); }
 .chip--espera { background: var(--lila-claro); color: var(--morado-oscuro); }
@@ -951,7 +955,7 @@ function apiStore() {
   const traerAgotados = () => pedir('/api/agotados').then(repartir).catch(() => {});
   // El panel se refresca cada 3 s mientras está abierto; el cliente consulta solo su pedido en curso.
   setInterval(() => { if (vistaActual === 'panel' && panelAbierto) traerPedidos(); }, 3000);
-  setInterval(() => { for (const p of propios) if (!p.fin) pedir('/api/orders?id=' + encodeURIComponent(p.id)).then(d => { if (d.pedido) { p.fin = d.pedido.status === 'entregado'; p.fn(d.pedido); } }).catch(() => {}); }, 4000);
+  setInterval(() => { for (const p of propios) if (!p.fin) pedir('/api/orders?id=' + encodeURIComponent(p.id)).then(d => { if (d.pedido) { p.fin = ['entregado', 'cancelado'].includes(d.pedido.status); p.fn(d.pedido); } }).catch(() => {}); }, 4000);
   setInterval(traerAgotados, 20000);
   // El panel refresca las unidades para que el aviso de "por agotarse" salga sin recargar.
   setInterval(() => { if (vistaActual === 'panel' && panelAbierto) pedir('/api/agotados?panel=1').then(pintarInventario).catch(() => {}); }, 20000);
@@ -969,8 +973,8 @@ const storeReady = Promise.resolve().then(apiStore);
 
 /* ---------- pedido del cliente ---------- */
 const STEPS = [['armando', 'Armando'], ['esperando_pago', 'Esperando pago'], ['por_confirmar', 'Confirmando'], ['alistando', 'Alistando'], ['en_camino', 'En camino']];
-const CLOSED = ['por_confirmar', 'alistando', 'en_camino', 'entregado'];
-const NEXT = { por_confirmar: ['alistando', 'esperando_pago'], alistando: ['en_camino'], en_camino: ['entregado'] };
+const CLOSED = ['por_confirmar', 'alistando', 'en_camino', 'entregado', 'cancelado'];
+const NEXT = { por_confirmar: ['alistando', 'esperando_pago'], alistando: ['en_camino', 'cancelado'], en_camino: ['entregado', 'cancelado'] };
 let order;
 function newOrder() { const t = Date.now(); order = { id: 'p' + t.toString(36) + Math.random().toString(36).slice(2, 10), no: 1000 + Math.floor(t / 1000) % 9000, items: [], direccion: '', pago: '', pagaCon: 0, status: 'armando', proof: '', proofMonto: 0, rechazo: 0, hora: t, saved: false }; }
 newOrder();
@@ -1014,7 +1018,8 @@ function snapshot(o) {
 }
 const SHOP_MSG = { alistando: o => order.programado ? 'Pago confirmado. Tu pedido #' + o.no + ' queda programado para ' + order.programado.texto + '.' : 'Pago confirmado: tu pedido #' + o.no + ' quedó confirmado ✅ y llega en máximo 10 minutos. Gracias por preferir a Sauko.',
   esperando_pago: o => 'No pudimos confirmar el pago del pedido #' + o.no + '. ¿Nos envías de nuevo el comprobante, por favor?',
-  en_camino: o => 'Veci, tu pedido #' + o.no + ' ya va en camino.', entregado: () => 'Pedido entregado. Gracias por comprar en Sauko Store.' };
+  en_camino: o => 'Veci, tu pedido #' + o.no + ' ya va en camino.', entregado: () => 'Pedido entregado. Gracias por comprar en Sauko Store.',
+  cancelado: o => 'Veci, tu pedido #' + o.no + ' fue cancelado. Si fue un error, escribinos y lo armamos de nuevo.' };
 async function sync() {
   const o = order; if (o.status === 'armando' && !o.saved) return;
   const s = await storeReady;
@@ -1433,6 +1438,8 @@ const turnoDe = o => horaProgramada(o) ? horaProgramada(o) - ANTES_DE_ENTREGAR :
 const yaToca = o => !!horaProgramada(o) && o.status === 'alistando' && Date.now() >= horaProgramada(o) - ANTES_DE_ENTREGAR;
 const duracion = ms => { const min = Math.max(1, Math.round(Math.abs(ms) / 60000)); return min < 60 ? min + ' min' : Math.floor(min / 60) + ' h' + (min % 60 ? ' ' + (min % 60) + ' min' : ''); };
 let firmaTablero = '', tarjetasVistas = new Set();
+// Pedidos con el formulario de cancelación abierto, y los motivos (los mismos que acepta el servidor).
+const cancelando = new Set(), MOTIVOS_CANCELACION = ['El cliente canceló', 'No se encontró la dirección', 'No había producto', 'Otro'];
 function tarjeta(o) {
   const pendiente = !!horaProgramada(o) && ['esperando_pago', 'por_confirmar', 'alistando'].includes(o.status), falta = horaProgramada(o) - Date.now();
   // Solo se anima la primera vez que aparece en esa columna.
@@ -1480,6 +1487,22 @@ function tarjeta(o) {
     acts.append(todos, go, h('small', null, set.size + ' de ' + items.length + ' alistados'));
   } else if (o.status === 'en_camino') {
     const done = h('button', { class: 'btn btn--linea', type: 'button' }, 'Marcar entregado'); done.onclick = () => act(o, { status: 'entregado' }); acts.append(done);
+  }
+  // Cancelar un pedido que ya está en la tienda: pide el motivo y si las unidades vuelven al inventario.
+  if (['alistando', 'en_camino'].includes(o.status)) {
+    if (cancelando.has(o.id)) {
+      const motivo = h('select', { 'aria-label': 'Motivo de la cancelación' }, ...MOTIVOS_CANCELACION.map(m => h('option', { value: m }, m)));
+      const devolver = h('input', { type: 'checkbox', checked: true });
+      const si = h('button', { class: 'btn btn--peligro', type: 'button' }, 'Confirmar cancelación'), no = h('button', { class: 'btn btn--linea', type: 'button' }, 'Volver');
+      si.onclick = () => { cancelando.delete(o.id); act(o, { status: 'cancelado', motivo: motivo.value, devolver: devolver.checked }); };
+      no.onclick = () => { cancelando.delete(o.id); renderPanel(); };
+      el.append(h('div', { class: 'cancelar' }, h('b', null, '¿Por qué se cancela el pedido #' + o.no + '?'), motivo,
+        h('label', null, devolver, ' Devolver las unidades al inventario'), h('small', null, 'Desmárcalo si el producto se dañó o no regresó a la tienda. Al cliente le llega un aviso por WhatsApp.'), h('div', { class: 'acciones' }, si, no)));
+    } else {
+      const cancelar = h('button', { class: 'mini mini--mal', type: 'button' }, 'Cancelar pedido');
+      cancelar.onclick = () => { cancelando.add(o.id); renderPanel(); };
+      acts.append(cancelar);
+    }
   }
   if (acts.children.length) el.append(acts);
   return el;
