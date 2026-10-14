@@ -25,4 +25,9 @@ assert.equal((await listarPedidos()).length, 0, "archivado sale del panel");
 assert.equal((await leerPedido(pedido.id)).id, pedido.id, "pero queda en el historial");
 assert.equal(await leerPedido("noexiste"), null);
 
+// Cancelado en el panel y luego el cliente sigue: en WhatsApp arranca pedido nuevo; si se vuelve a guardar el mismo, reaparece.
+assert.equal(await leerPedido(pedido.id, true), null, "un pedido archivado no se retoma");
+await guardarPedido({ ...pedido, status: "alistando" });
+assert.equal((await listarPedidos()).filter((p) => p.id === pedido.id).length, 1, "si el cliente lo vuelve a guardar, reaparece en el panel");
+
 console.log("Pedidos en Postgres: todo bien.");
