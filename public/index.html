@@ -856,6 +856,24 @@ let AGOTADOS = {};
 // TOPES: cuántas unidades se pueden pedir de los productos de los que quedan pocas. No se le muestra al cliente.
 let TOPES = {};
 const avail = p => AGOTADOS[p.sku] ? 0 : Math.min(MAX_POR_PRODUCTO, TOPES[p.sku] || MAX_POR_PRODUCTO);
+// Pedidos genéricos: palabras que no nombran un producto sino una familia. Buscarlas tal cual trae
+// cosas sin relación ('dulce' → maíz dulce), así que se le devuelven al asistente los tipos por los que
+// debe preguntar. Cada tipo es una palabra que sí funciona en la búsqueda.
+const GENERICOS = [
+  [['dulce', 'golosina', 'antojo', 'confite'], ['Chocolatina', 'Gomas', 'Galletas']],
+  [['mecato', 'pasaboca', 'snack', 'picar', 'paquete'], ['Papas', 'Maní', 'Doritos']],
+  [['bebida', 'tomar', 'refresco', 'liquido', 'sed'], ['Gaseosa', 'Jugo', 'Agua']],
+  [['trago', 'licor', 'alcohol', 'beber'], ['Cerveza', 'Aguardiente', 'Ron']],
+  [['aseo', 'limpieza', 'limpiar'], ['Jabón', 'Detergente', 'Papel higiénico']],
+  [['desayuno', 'desayunar'], ['Pan', 'Huevos', 'Leche']],
+];
+const RELLENO = new Set(['un', 'una', 'unos', 'unas', 'algo', 'alguna', 'algun', 'de', 'del', 'para', 'el', 'la', 'los', 'las', 'que', 'quiero', 'necesito', 'tienes', 'tienen', 'hay', 'me', 'das', 'dame', 'venden', 'por', 'favor', 'porfa', 'y', 'o', 'a', 'con', 'cosa', 'cosas', 'rico', 'rica', 'bueno']);
+function pedidoGenerico(consulta) {
+  const palabras = norm(consulta).split(' ').filter(t => t && !RELLENO.has(t)).map(t => t.length > 4 && t.endsWith('s') ? t.slice(0, -1) : t);
+  if (!palabras.length) return null;
+  const familia = GENERICOS.find(([claves]) => palabras.every(t => claves.includes(t)));
+  return familia ? { pedido_generico: true, tipos: familia[1], instruccion: 'El cliente no dijo qué producto quiere. No ofrezcas productos todavía: pregúntale qué tipo busca y ofrécele estos tipos con ofrecer_botones. Cuando elija uno, búscalo con esa palabra.' } : null;
+}
 function search(q, k = 8, pool = CAT) {
   const qt = norm(q).split(' ').filter(Boolean).map(t => t.length > 4 && t.endsWith('s') ? t.slice(0, -1) : t);
   if (!qt.length) return [];
@@ -867,6 +885,8 @@ function search(q, k = 8, pool = CAT) {
       else if (p.tok.some(x => x.startsWith(t))) { score += 1.5; hit++; }
       else if (t.length > 2 && p.n.includes(t)) { score += 1; hit++; }
     }
+    // El nombre empieza por el tipo de producto: si coincide con lo pedido, es justo eso y no un sabor o un acompañante.
+    if (qt.length === 1 && qt.includes(p.tok[0].length > 4 && p.tok[0].endsWith('s') ? p.tok[0].slice(0, -1) : p.tok[0])) score += 1;
     if (hit >= need) out.push([score, p]);
   }
   // A igual coincidencia gana el más vendido: el catálogo viene ordenado por ventas y el orden se conserva.
@@ -1090,7 +1110,7 @@ const TOOLS = [
   { name: 'buscar_productos',
     description: 'Busca en el catálogo de Sauko Store por palabras clave (marca, producto, tamaño). Devuelve hasta 8 productos con sku, nombre, precio en COP y si está disponible. Úsala antes de mencionar cualquier producto o precio.',
     inputSchema: { type: 'object', properties: { consulta: { type: 'string', description: 'Palabras clave, por ejemplo "coca cola 1.5"' } }, required: ['consulta'] },
-    execute(input) { const q = String(input.consulta || ''), res = search(q); log('Buscó "' + q + '" en el catálogo: ' + res.length + ' resultado' + (res.length === 1 ? '' : 's'));
+    execute(input) { const q = String(input.consulta || ''), generico = pedidoGenerico(q); if (generico) { log('Pedido genérico "' + q + '": pregunta el tipo'); return generico; } const res = search(q); log('Buscó "' + q + '" en el catálogo: ' + res.length + ' resultado' + (res.length === 1 ? '' : 's'));
       return res.map(p => ({ sku: p.sku, nombre: p.name, precio: p.price, disponible: avail(p) > 0, tiene_foto: !!p.foto })); } },
   { name: 'enviar_foto_producto',
     description: 'Le envía al cliente la foto de un producto del catálogo. Úsala cuando pida ver un producto. Devuelve si se envió; no todos los productos tienen foto.',
