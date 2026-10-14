@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   try {
     const { content, stop_reason } = await paso(mensajes);
     if (stop_reason === "refusal") {
-      return res.status(200).json({ content: [{ type: "text", text: "Qué pena veci, con eso no te puedo ayudar por acá. ¿Te armo un pedido?" }], stop_reason: "end_turn" });
+      return res.status(200).json({ content: [{ type: "text", text: "Veci, con eso no te puedo ayudar por acá. ¿Hay algo más en lo que te pueda colaborar?" }], stop_reason: "end_turn" });
     }
     return res.status(200).json({ content, stop_reason });
   } catch (error) {

@@ -984,7 +984,7 @@ async function cargarNegocio() {
     const h12 = n => (n % 12 || 12) + (n % 24 < 12 ? ' a.m.' : ' p.m.');
     if (c && c.domicilios && $('local-horario')) $('local-horario').textContent = 'Domicilios de ' + h12(c.domicilios.desde) + ' a ' + h12(c.domicilios.hasta);
     if (c && c.domicilios && c.domicilios.costo != null) DOMICILIOS = c.domicilios;
-    if (c && Number(c.costoDomicilio) >= 0) NEGOCIO = { costoDomicilio: Number(c.costoDomicilio), datosTransferencia: String(c.datosTransferencia || ''), notaHorario: String(c.notaHorario || ''), encargo: String(c.encargo || '') };
+    if (c && Number(c.costoDomicilio) >= 0) NEGOCIO = { franja: String(c.franja || ''), costoDomicilio: Number(c.costoDomicilio), datosTransferencia: String(c.datosTransferencia || ''), notaHorario: String(c.notaHorario || ''), encargo: String(c.encargo || '') };
   } catch (e) {}
 }
 // Entrega programada: mismas reglas que el servidor, que las vuelve a revisar al guardar el pedido.
@@ -1012,7 +1012,7 @@ function snapshot(o) {
   return { id: o.id, no: o.no, canal: 'Web', direccion: o.direccion, pago: o.pago, pagaCon: o.pagaCon, status: o.status, total: totals(o.items).total, proof: o.proof, proofMonto: o.proofMonto, rechazo: o.rechazo, hora: o.hora, programado: o.programado ? { ts: o.programado.ts } : null,
     items: o.items.map(i => { const p = BY_SKU.get(i.sku); return { sku: i.sku, name: p.name, price: p.price, qty: i.qty }; }) };
 }
-const SHOP_MSG = { alistando: o => order.programado ? 'Pago confirmado. Tu pedido #' + o.no + ' queda programado para ' + order.programado.texto + '.' : 'Pago confirmado. Ya estamos alistando tu pedido #' + o.no + ' y llega en máximo 10 minutos.',
+const SHOP_MSG = { alistando: o => order.programado ? 'Pago confirmado. Tu pedido #' + o.no + ' queda programado para ' + order.programado.texto + '.' : 'Pago confirmado: tu pedido #' + o.no + ' quedó confirmado ✅ y llega en máximo 10 minutos. Gracias por preferir a Sauko.',
   esperando_pago: o => 'No pudimos confirmar el pago del pedido #' + o.no + '. ¿Nos envías de nuevo el comprobante, por favor?',
   en_camino: o => 'Veci, tu pedido #' + o.no + ' ya va en camino.', entregado: () => 'Pedido entregado. Gracias por comprar en Sauko Store.' };
 async function sync() {
@@ -1255,10 +1255,10 @@ const TOOLS = [
 ];
 // Botones de respuesta rápida: el asistente los pide con ofrecer_botones y salen debajo de su mensaje.
 let botonesPendientes = [], botonesOfrecidos = [];
-const PREGUNTA_PAGO = /c[oó]mo[^.?!]{0,40}\bpag(ar|[aá]s|a)\b[^.!]*\?|forma de pago[^.!]*\?|m[eé]todo de pago[^.!]*\?/i;
+const PREGUNTA_PAGO = /c[oó]mo[^.?!]{0,40}\bpag(ar|[aá]s|a)\b[^.!]*\?|forma de pago[^.!]*\?|m[eé]todo de pago[^.!]*\?|transferencia o efectivo/i;
 function pintarBotones(respuesta) {
   // La forma de pago siempre va con botones, aunque el modelo haya olvidado pedirlos.
-  if (!botonesPendientes.length && order.status === 'armando' && order.items.length && !order.pago && PREGUNTA_PAGO.test(respuesta || '')) botonesPendientes = ['Transferencia', 'Contraentrega'].map(titulo => ({ titulo, detalle: '' }));
+  if (!botonesPendientes.length && order.status === 'armando' && order.items.length && !order.pago && PREGUNTA_PAGO.test(respuesta || '')) botonesPendientes = ['Transferencia', 'Efectivo'].map(titulo => ({ titulo, detalle: '' }));
   botonesOfrecidos = botonesPendientes.map(b => [b.titulo, b.detalle].filter(Boolean).join(' · '));
   if (!botonesPendientes.length) return;
   const fila = h('div', { class: 'msg-botones' }, ...botonesPendientes.map(b => { const texto = [b.titulo, b.detalle].filter(Boolean).join(' · ');
@@ -1314,6 +1314,13 @@ async function sampleApi(turnos, opts) {
 let sample = sampleApi, agenteListo = true, turns = [], pendingImg = null, busy = false;
 const chat = $('chat'), mensajes = $('chat-mensajes');
 function bubble(tipo, text, img) { const el = h('div', { class: 'msg msg--' + tipo }); if (img) el.append(h('img', { src: URL.createObjectURL(img), alt: 'Imagen enviada' })); el.append(text || ''); mensajes.append(el); mensajes.scrollTop = mensajes.scrollHeight; return el; }
+// Saludo del protocolo de la tienda, según la hora en Cali y la franja de domicilios.
+function saludoInicial() {
+  const hora = (new Date().getUTCHours() + 19) % 24, saludo = hora < 12 ? 'Buenos días' : hora < 18 ? 'Buenas tardes' : 'Buenas noches';
+  const h12 = n => (n % 12 || 12) + (n % 24 < 12 ? ' a.m.' : ' p.m.');
+  const extra = NEGOCIO.franja === 'prime' ? ' Contamos con nuestro servicio Prime, entregas hasta las ' + h12(DOMICILIOS.hasta) + '.' : NEGOCIO.franja === 'cerrado' ? ' Estamos disponibles desde las ' + h12(DOMICILIOS.desde) + '; si querés, te dejamos el pedido como encargo.' : '';
+  return 'Hola, veci. ' + saludo + ', esperamos que estés muy bien. 👋' + extra + ' ¿En qué te podemos colaborar?';
+}
 function setPending(file) { pendingImg = file; $('chat-adjunto').hidden = !file; $('chat-adjunto').textContent = file ? 'Foto lista para enviar: ' + file.name : ''; if (!file) $('foto').value = ''; }
 function agentGone() { sample = null; if (!mensajes.querySelector('.msg--error')) bubble('error', SIN_AGENTE); }
 // En celular el pedido se hace por el WhatsApp de la tienda: se abre con el mensaje ya escrito,
@@ -1332,7 +1339,7 @@ function abrirWhatsApp(mensaje) {
 function abrirChat(mensaje) {
   if (esCelular()) return abrirWhatsApp(mensaje);
   chat.classList.add('is-abierto'); chat.setAttribute('aria-hidden', 'false'); $('burbuja').classList.add('is-oculta');
-  if (!mensajes.childElementCount) { bubble('bot', '¡Quiubo, veci! Bienvenido a Sauko. ¿Qué te hace falta hoy?'); if (agenteListo && !sample) agentGone(); }
+  if (!mensajes.childElementCount) { bubble('bot', saludoInicial()); if (agenteListo && !sample) agentGone(); }
   if (mensaje && !busy) enviar(mensaje);
 }
 function cerrarChat() { chat.classList.remove('is-abierto'); chat.setAttribute('aria-hidden', 'true'); $('burbuja').classList.remove('is-oculta'); }
