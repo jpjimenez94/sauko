@@ -283,7 +283,8 @@ input { font: inherit; color: inherit; }
 .programado { display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; align-items: center; font-size: 0.9rem; }
 .tarjeta--toca .programado b { color: var(--mal); }
 .chip--espera { background: var(--lila-claro); color: var(--morado-oscuro); }
-.tarjeta { background: #fff; border-radius: 18px; padding: 1rem; border-left: 8px solid var(--sol); display: grid; gap: 0.6rem; animation: entra 0.5s ease; }
+.tarjeta { background: #fff; border-radius: 18px; padding: 1rem; border-left: 8px solid var(--sol); display: grid; gap: 0.6rem; }
+.tarjeta--nueva { animation: entra 0.5s ease; }
 @keyframes entra { from { transform: translateY(16px); opacity: 0; } }
 .tarjeta__cabeza { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
 .tarjeta strong.n { font-family: var(--display); font-weight: 800; font-size: 1.4rem; color: var(--morado-oscuro); line-height: 1; }
@@ -1335,7 +1336,7 @@ function sesionAbierta(usuario) {
 async function revisarSesion() {
   try { sesionAbierta((await pedir('/api/sesion')).usuario); }
   catch (e) {
-    YO = null; pintarSesion(); panelListo(false); panelOrders = []; yaAvisados = null; renderPanel();
+    YO = null; pintarSesion(); panelListo(false); panelOrders = []; yaAvisados = null; firmaTablero = ''; firmaInventario = ''; renderPanel();
     const primero = e.status === 401 && !!(e.datos && e.datos.sinUsuarios);
     $('primer-form').hidden = !primero; $('login-form').hidden = primero;
     if (e.status !== 401) $('login-error').textContent = 'Sin conexión con el servidor. Intenta de nuevo.';
@@ -1358,9 +1359,12 @@ const horaProgramada = o => (o.programado && Number(o.programado.ts)) || 0;
 const turnoDe = o => horaProgramada(o) ? horaProgramada(o) - ANTES_DE_ENTREGAR : o.hora;
 const yaToca = o => !!horaProgramada(o) && o.status === 'alistando' && Date.now() >= horaProgramada(o) - ANTES_DE_ENTREGAR;
 const duracion = ms => { const min = Math.max(1, Math.round(Math.abs(ms) / 60000)); return min < 60 ? min + ' min' : Math.floor(min / 60) + ' h' + (min % 60 ? ' ' + (min % 60) + ' min' : ''); };
+let firmaTablero = '', tarjetasVistas = new Set();
 function tarjeta(o) {
   const pendiente = !!horaProgramada(o) && ['esperando_pago', 'por_confirmar', 'alistando'].includes(o.status), falta = horaProgramada(o) - Date.now();
-  const el = h('article', { class: 'tarjeta' + (yaToca(o) ? ' tarjeta--toca' : pendiente ? ' tarjeta--espera' : '') }), items = Array.isArray(o.items) ? o.items : [];
+  // Solo se anima la primera vez que aparece en esa columna.
+  const nueva = !tarjetasVistas.has(o.id + ':' + o.status); tarjetasVistas.add(o.id + ':' + o.status);
+  const el = h('article', { class: 'tarjeta' + (nueva ? ' tarjeta--nueva' : '') + (yaToca(o) ? ' tarjeta--toca' : pendiente ? ' tarjeta--espera' : '') }), items = Array.isArray(o.items) ? o.items : [];
   el.append(h('div', { class: 'tarjeta__cabeza' }, h('strong', { class: 'n num' }, '#' + o.no), h('small', { class: 'num' }, new Date(o.hora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) + ' · ' + String(o.canal || 'Web') + (o.cliente ? ' +' + String(o.cliente).replace(/^[+]/, '') : ''))));
   el.append(h('p', null, h('b', null, 'Entrega: '), String(o.direccion || '')));
   if (pendiente) {
@@ -1561,9 +1565,13 @@ let INV = { agotados: {}, existencias: {} };
 const POCAS = 2;
 const sinUnidades = p => INV.existencias[p.sku] != null && INV.existencias[p.sku] <= 0;
 const porAgotarse = p => INV.existencias[p.sku] != null && INV.existencias[p.sku] > 0 && INV.existencias[p.sku] <= POCAS;
+let firmaInventario = '';
 function pintarInventario(d) {
+  const firma = JSON.stringify([d.agotados || {}, d.existencias || {}]), igual = firma === firmaInventario;
+  firmaInventario = firma;
   INV = { agotados: d.agotados || {}, existencias: d.existencias || {} };
-  renderInv();
+  if (igual) return d;
+  if (!$('inv-filas').contains(document.activeElement)) renderInv();
   // Aviso en la pestaña de pedidos: lo que está por agotarse y lo que se quedó sin unidades.
   const pocos = CAT.filter(porAgotarse), cero = CAT.filter(sinUnidades), caja = $('aviso-stock');
   caja.hidden = !pocos.length && !cero.length;
@@ -1689,7 +1697,11 @@ fetch('catalog.json').then(r => r.json()).then(d => {
   if (hayGsap && !sinMovimiento) { gsap.from('.acceso', { y: 50, opacity: 0, duration: 0.6, stagger: 0.05, ease: 'power3.out', clearProps: 'all', scrollTrigger: { trigger: '#cat-accesos', start: 'top 88%' } }); ScrollTrigger.refresh(); }
   const vista = location.hash.slice(1); if (vista === 'panel' || vista === 'carta') verVista(vista);
 }).catch(() => { $('cat-accesos').replaceChildren(h('p', null, 'No se pudo cargar el catálogo. Recarga la página.')); });
-storeReady.then(s => { store = s; s.all(list => { panelOrders = list; avisarNuevos(list); renderPanel(); });
+storeReady.then(s => { store = s; s.all(list => {
+    const firma = JSON.stringify(list.map(o => [o.id, o.status, o.total, o.proofMonto, o.rechazo, o.encargo, (o.items || []).length])) + (list.some(o => o.programado) ? Math.floor(Date.now() / 60000) : '');
+    panelOrders = list; avisarNuevos(list);
+    if (firma !== firmaTablero) { firmaTablero = firma; renderPanel(); }
+  });
   s.agotados(mapa => { AGOTADOS = mapa || {}; pintarEstado(); renderInv(); });
   if (vistaActual === 'panel') entrarAlPanel(); });
 </script>
