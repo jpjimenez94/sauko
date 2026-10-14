@@ -4,7 +4,7 @@ import { leerAjustes, guardarAjustes, leerBitacora, contarPromos, leerConsumo, m
 import { hayWhatsApp } from "../lib/whatsapp.js";
 import { modeloEnUso } from "../lib/agente.js";
 import { telefonoDomiciliario } from "../lib/domiciliarios.js";
-import { turnoAbierto } from "../lib/store.js";
+import { turnoDe } from "../lib/store.js";
 
 /** Lo que el panel muestra del gasto en IA. El saldo es una estimación: lo que el administrador dijo que había menos lo gastado desde entonces. */
 function resumenDeIA(credito, consumo) {
@@ -34,7 +34,7 @@ function resumenDeIA(credito, consumo) {
 // ve y cambia lo demás.
 /** Los domiciliarios con su turno. El teléfono solo lo ve el administrador. */
 async function domiciliariosPara(lista, admin) {
-  return Promise.all((Array.isArray(lista) ? lista : []).map(async (d) => ({ id: d.id, nombre: d.nombre, activo: d.activo, turno: d.activo ? await turnoAbierto(telefonoDomiciliario(d.telefono)) : false, ...(admin ? { telefono: d.telefono } : {}) })));
+  return Promise.all((Array.isArray(lista) ? lista : []).map(async (d) => ({ id: d.id, nombre: d.nombre, activo: d.activo, turno: d.activo ? Boolean(await turnoDe(d.id)) : false, ...(admin ? { telefono: d.telefono } : {}) })));
 }
 
 export default async function handler(req, res) {
@@ -80,7 +80,7 @@ export default async function handler(req, res) {
           nombre: String(d.nombre ?? "").replace(/\s+/g, " ").trim().slice(0, 40),
           telefono: telefonoDomiciliario(d.telefono),
           activo: d.activo !== false,
-        })).filter((d) => d.nombre && d.telefono.length >= 10);
+        })).filter((d) => d.nombre && (d.telefono.startsWith("@") ? d.telefono.length > 2 : d.telefono.length >= 10));
       }
       await guardarAjustes(ajustes);
       return res.status(200).json({ domiciliarios: await domiciliariosPara(ajustes.domiciliarios, true), whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, apagadoSolo: Boolean(ajustes.apagadoSolo), negocio: await cargarNegocio(true), ia: resumenDeIA(ajustes.credito, consumo) });

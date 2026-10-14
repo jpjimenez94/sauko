@@ -748,7 +748,7 @@ input { font: inherit; color: inherit; }
           <div class="bitacora__lista" id="domis-lista"></div>
           <div class="formulario">
             <label class="rotulo">Nombre<input class="campo" id="domi-nombre" type="text" maxlength="40"></label>
-            <label class="rotulo">WhatsApp <small>celular de 10 dígitos</small><input class="campo" id="domi-telefono" type="tel" inputmode="numeric" maxlength="15"></label>
+            <label class="rotulo">WhatsApp <small>celular de 10 dígitos, o @usuario si usa nombre de usuario</small><input class="campo" id="domi-telefono" type="text" maxlength="40" autocapitalize="none" spellcheck="false"></label>
             <button class="btn btn--morado" type="button" id="domi-agregar">Agregar domiciliario</button>
           </div>
           <p class="vacio" id="domis-estado" role="status"></p>
@@ -1731,8 +1731,8 @@ function guardarDomiciliarios(lista) {
 // Enter en estos campos agrega al domiciliario (y no envía el formulario de ajustes).
 for (const id of ['domi-nombre', 'domi-telefono']) $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('domi-agregar').click(); } });
 $('domi-agregar').onclick = () => {
-  const nombre = $('domi-nombre').value.trim(), telefono = $('domi-telefono').value.replace(/\D/g, '');
-  if (!nombre || telefono.length < 10) { $('domis-estado').textContent = 'Escribí el nombre y un WhatsApp de 10 dígitos.'; return; }
+  const nombre = $('domi-nombre').value.trim(), escrito = $('domi-telefono').value.trim(), telefono = escrito.startsWith('@') ? escrito.replace(/\s/g, '') : escrito.replace(/\D/g, '');
+  if (!nombre || (telefono.startsWith('@') ? telefono.length < 3 : telefono.length < 10)) { $('domis-estado').textContent = 'Escribí el nombre y un WhatsApp de 10 dígitos o su @usuario.'; return; }
   guardarDomiciliarios([...DOMIS, { nombre, telefono, activo: true }]).then(() => { $('domi-nombre').value = ''; $('domi-telefono').value = ''; });
 };
 
