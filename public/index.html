@@ -235,7 +235,8 @@ input { font: inherit; color: inherit; }
 .escribiendo i:nth-child(2) { animation-delay: 0.15s; } .escribiendo i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes punto { 0%, 60%, 100% { transform: none; opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
 .msg-botones { align-self: flex-start; display: flex; flex-wrap: wrap; gap: 0.35rem; max-width: 92%; }
-.msg-botones button { padding: 0.45rem 0.9rem; border-radius: 999px; background: #fff; border: 1.5px solid var(--verde-wa); color: #12703b; font-weight: 700; font-size: 0.88rem; display: grid; text-align: left; }
+.msg-botones button { padding: 0.45rem 0.9rem; border-radius: 14px; background: #fff; border: 1.5px solid var(--verde-wa); color: #12703b; font-weight: 700; font-size: 0.88rem; display: grid; text-align: left; }
+.msg-botones__otra { flex-basis: 100%; opacity: 0.75; font-size: 0.82rem; }
 .msg-botones button small { font-weight: 400; color: var(--tinta); opacity: 0.75; }
 .chat__sugerencias { display: flex; gap: 0.4rem; padding: 0 0.8rem 0.5rem; overflow-x: auto; scrollbar-width: none; }
 .chat__sugerencias button { flex: none; padding: 0.4rem 0.8rem; border-radius: 999px; background: #fff; font-size: 0.82rem; border: 1px solid rgba(0, 0, 0, 0.1); }
@@ -1083,10 +1084,10 @@ const TOOLS = [
       return pedir('/api/solicitados', { method: 'POST', body: JSON.stringify({ producto }) }).catch(() => ({ anotado: false })); } },
   { name: 'ofrecer_botones',
     description: 'Pega a tu respuesta opciones para que el cliente conteste con un toque. De 2 a 3 opciones salen como botones; de 4 a 10, como una lista. Úsala cuando lo que esperas es una de pocas respuestas cerradas. Tu respuesta de texto es la pregunta.',
-    inputSchema: { type: 'object', properties: { opciones: { type: 'array', items: { type: 'object', properties: { titulo: { type: 'string', description: 'Lo que dice el botón: máximo 20 caracteres' }, detalle: { type: 'string', description: 'El precio cuando la opción es un producto, por ejemplo "$8.200". Se muestra junto al título.' } }, required: ['titulo'] } } }, required: ['opciones'] },
+    inputSchema: { type: 'object', properties: { opciones: { type: 'array', items: { type: 'object', properties: { titulo: { type: 'string', description: 'La opción. Si es un producto, su nombre completo del catálogo; si no, un texto corto de máximo 20 caracteres' }, detalle: { type: 'string', description: 'El precio cuando la opción es un producto, por ejemplo "$8.200". Se muestra junto al título.' } }, required: ['titulo'] } } }, required: ['opciones'] },
     execute(input) {
       const vistos = new Set(), limpias = [];
-      for (const o of Array.isArray(input.opciones) ? input.opciones : []) { const titulo = String((o && o.titulo) || '').trim(); if (!titulo || vistos.has(titulo.toLowerCase())) continue; vistos.add(titulo.toLowerCase()); limpias.push({ titulo: titulo.slice(0, 24), detalle: String((o && o.detalle) || '').trim().slice(0, 72) }); }
+      for (const o of Array.isArray(input.opciones) ? input.opciones : []) { const titulo = String((o && o.titulo) || '').trim(); if (!titulo || vistos.has(titulo.toLowerCase())) continue; vistos.add(titulo.toLowerCase()); limpias.push({ titulo: titulo.slice(0, 60), detalle: String((o && o.detalle) || '').trim().slice(0, 72) }); }
       if (limpias.length < 2) throw new Error('Se necesitan al menos 2 opciones distintas');
       botonesPendientes = limpias.slice(0, 10); log('Ofreció botones: ' + botonesPendientes.map(b => b.titulo).join(' / '));
       return { listo: true, nota: 'Los botones salen pegados a tu respuesta: escribe la pregunta y no repitas las opciones en el texto.' };
@@ -1164,6 +1165,8 @@ function pintarBotones(respuesta) {
   if (!botonesPendientes.length) return;
   const fila = h('div', { class: 'msg-botones' }, ...botonesPendientes.map(b => { const texto = [b.titulo, b.detalle].filter(Boolean).join(' · ');
     const boton = h('button', { type: 'button' }, b.titulo, b.detalle ? h('small', null, b.detalle) : null); boton.onclick = () => enviar(texto); return boton; }));
+  // Cuando las opciones son productos (traen precio) son las más vendidas, no las únicas: se invita a pedir otra.
+  if (botonesPendientes.some(b => b.detalle)) fila.append(h('small', { class: 'msg-botones__otra' }, 'Si tenés otra en mente, escribime cuál y te la busco.'));
   mensajes.append(fila); botonesPendientes = [];
 }
 function stateText() {
