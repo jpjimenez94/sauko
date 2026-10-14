@@ -1,4 +1,4 @@
-import { bajarImagenYCloud, bajarAudioYCloud, firmaYCloudValida } from "../lib/whatsapp.js";
+import { bajarImagenYCloud, bajarAudioYCloud, firmaYCloudValida, textoDeBoton } from "../lib/whatsapp.js";
 import { atenderEntrante, cuerpoCrudo } from "../lib/entrada.js";
 import { anotar, pausar } from "../lib/store.js";
 import { cargarNegocio } from "../lib/comun.js";
@@ -50,12 +50,16 @@ export default async function handler(req, res) {
     await anotar("aviso sin teléfono o sin id", JSON.stringify(forma));
   }
 
+  // Un toque en un botón o en una lista llega como mensaje "interactive": se atiende como si lo hubiera escrito.
+  const tocado = textoDeBoton(m);
+  if (!tocado && ["interactive", "button"].includes(m.type)) await anotar("botón sin texto reconocible", JSON.stringify(m.interactive ?? m.button ?? {}).slice(0, 250));
+
   const trabajo = atenderEntrante({
     id: m.wamid || m.id,
     telefono: remitente,
     usuario: m.customerProfile?.username,
-    tipo: m.type,
-    texto: m.text?.body ?? m.image?.caption ?? "",
+    tipo: tocado ? "text" : m.type,
+    texto: tocado || (m.text?.body ?? m.image?.caption ?? ""),
     bajar: () => bajarImagenYCloud(m.image),
     bajarAudio: () => bajarAudioYCloud(m.audio ?? m.voice),
   });

@@ -1,4 +1,4 @@
-import { bajarImagen, bajarAudio, firmaValida } from "../lib/whatsapp.js";
+import { bajarImagen, bajarAudio, firmaValida, textoDeBoton } from "../lib/whatsapp.js";
 import { atenderEntrante, cuerpoCrudo } from "../lib/entrada.js";
 
 // Webhook de WhatsApp Cloud API (Meta directo).
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   const mensajes = (cuerpo.entry ?? []).flatMap((e) => e.changes ?? []).flatMap((c) => c.value?.messages ?? []);
   const trabajo = Promise.all(
     mensajes.map((m) =>
-      atenderEntrante({ id: m.id, telefono: m.from, tipo: m.type, texto: m.text?.body ?? m.image?.caption ?? "", bajar: () => bajarImagen(m.image?.id), bajarAudio: () => bajarAudio(m.audio?.id) }),
+      atenderEntrante({ id: m.id, telefono: m.from, tipo: textoDeBoton(m) ? "text" : m.type, texto: textoDeBoton(m) || (m.text?.body ?? m.image?.caption ?? ""), bajar: () => bajarImagen(m.image?.id), bajarAudio: () => bajarAudio(m.audio?.id) }),
     ),
   );
   // Se responde cuando el asistente termina: si se contesta antes, Vercel corta el trabajo a medias.

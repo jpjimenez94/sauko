@@ -234,6 +234,9 @@ input { font: inherit; color: inherit; }
 .escribiendo i { width: 7px; height: 7px; border-radius: 50%; background: #9aa; animation: punto 1.1s infinite; }
 .escribiendo i:nth-child(2) { animation-delay: 0.15s; } .escribiendo i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes punto { 0%, 60%, 100% { transform: none; opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+.msg-botones { align-self: flex-start; display: flex; flex-wrap: wrap; gap: 0.35rem; max-width: 92%; }
+.msg-botones button { padding: 0.45rem 0.9rem; border-radius: 999px; background: #fff; border: 1.5px solid var(--verde-wa); color: #12703b; font-weight: 700; font-size: 0.88rem; display: grid; text-align: left; }
+.msg-botones button small { font-weight: 400; color: var(--tinta); opacity: 0.75; }
 .chat__sugerencias { display: flex; gap: 0.4rem; padding: 0 0.8rem 0.5rem; overflow-x: auto; scrollbar-width: none; }
 .chat__sugerencias button { flex: none; padding: 0.4rem 0.8rem; border-radius: 999px; background: #fff; font-size: 0.82rem; border: 1px solid rgba(0, 0, 0, 0.1); }
 .chat__adjunto { padding: 0 0.9rem 0.3rem; font-size: 0.8rem; opacity: 0.75; }
@@ -1059,6 +1062,16 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: { producto: { type: 'string', description: 'Marca, producto y tamaño como lo pidió el cliente, por ejemplo "Leche de almendras Silk 946 ml"' } }, required: ['producto'] },
     async execute(input) { const producto = String(input.producto || '').slice(0, 80); log('Anotó un producto que no tenemos: ' + producto);
       return pedir('/api/solicitados', { method: 'POST', body: JSON.stringify({ producto }) }).catch(() => ({ anotado: false })); } },
+  { name: 'ofrecer_botones',
+    description: 'Pega a tu respuesta opciones para que el cliente conteste con un toque. De 2 a 3 opciones salen como botones; de 4 a 10, como una lista. Úsala cuando lo que esperas es una de pocas respuestas cerradas. Tu respuesta de texto es la pregunta.',
+    inputSchema: { type: 'object', properties: { opciones: { type: 'array', items: { type: 'object', properties: { titulo: { type: 'string', description: 'Lo que dice el botón: máximo 20 caracteres' }, detalle: { type: 'string', description: 'Opcional, solo se ve en listas de 4 o más: por ejemplo el precio' } }, required: ['titulo'] } } }, required: ['opciones'] },
+    execute(input) {
+      const vistos = new Set(), limpias = [];
+      for (const o of Array.isArray(input.opciones) ? input.opciones : []) { const titulo = String((o && o.titulo) || '').trim(); if (!titulo || vistos.has(titulo.toLowerCase())) continue; vistos.add(titulo.toLowerCase()); limpias.push({ titulo: titulo.slice(0, 24), detalle: String((o && o.detalle) || '').trim().slice(0, 72) }); }
+      if (limpias.length < 2) throw new Error('Se necesitan al menos 2 opciones distintas');
+      botonesPendientes = limpias.slice(0, 10); log('Ofreció botones: ' + botonesPendientes.map(b => b.titulo).join(' / '));
+      return { listo: true, nota: 'Los botones salen pegados a tu respuesta: escribe la pregunta y no repitas las opciones en el texto.' };
+    } },
   { name: 'guardar_pedido',
     description: 'Reemplaza el pedido completo del cliente con la lista de items dada (estado absoluto, no incremental) y opcionalmente guarda dirección y método de pago. Devuelve el pedido con subtotal, domicilio, total y problemas de existencias.',
     inputSchema: { type: 'object', properties: {
@@ -1122,8 +1135,17 @@ const TOOLS = [
       return { recibido: true, siguiente: 'La tienda confirma el pago en su panel en un momento y el sistema le avisa al cliente por este chat. No digas todavía que el pago está confirmado ni que el pedido salió.' };
     } },
 ];
+// Botones de respuesta rápida: el asistente los pide con ofrecer_botones y salen debajo de su mensaje.
+let botonesPendientes = [], botonesOfrecidos = [];
+function pintarBotones() {
+  botonesOfrecidos = botonesPendientes.map(b => [b.titulo, b.detalle].filter(Boolean).join(' · '));
+  if (!botonesPendientes.length) return;
+  const fila = h('div', { class: 'msg-botones' }, ...botonesPendientes.map(b => { const texto = [b.titulo, b.detalle].filter(Boolean).join(' · ');
+    const boton = h('button', { type: 'button' }, b.titulo, b.detalle ? h('small', null, b.detalle) : null); boton.onclick = () => enviar(texto); return boton; }));
+  mensajes.append(fila); botonesPendientes = [];
+}
 function stateText() {
-  return '\n\n[Estado del pedido en pantalla #' + order.no + ': ' + JSON.stringify({ estado: order.status, items: order.items.map(i => ({ sku: i.sku, nombre: BY_SKU.get(i.sku).name, cantidad: i.qty })), ...totals(order.items), direccion: order.direccion || null, metodo_pago: order.pago || null }) + (NEGOCIO.notaHorario ? '. ' + NEGOCIO.notaHorario : '') + ']';
+  return '\n\n[Estado del pedido en pantalla #' + order.no + ': ' + JSON.stringify({ estado: order.status, items: order.items.map(i => ({ sku: i.sku, nombre: BY_SKU.get(i.sku).name, cantidad: i.qty })), ...totals(order.items), direccion: order.direccion || null, metodo_pago: order.pago || null }) + (NEGOCIO.notaHorario ? '. ' + NEGOCIO.notaHorario : '') + (botonesOfrecidos.length ? ' Botones que le ofreciste en tu mensaje anterior: ' + botonesOfrecidos.join(' | ') + '.' : '') + ']';
 }
 const ERR = { rate_limited: 'Hay muchas solicitudes seguidas. Espera un momento y vuelve a enviar.', session_expired: 'Tu sesión venció. Inicia sesión de nuevo.',
   image_rejected: 'No se pudo leer esa imagen. Prueba con otra foto (JPG o PNG).', refused: 'El asistente no pudo responder ese mensaje. Escríbelo de otra forma.',
@@ -1193,6 +1215,7 @@ async function enviar(texto, img) {
   if (busy || (!texto && !img) || !CAT.length) return;
   if (!sample) return agentGone();
   busy = true; $('chat-enviar').disabled = true; $('chat-sugerencias').hidden = true; setPending(null);
+  mensajes.querySelectorAll('.msg-botones').forEach(n => n.remove());
   bubble('yo', texto, img);
   await cargarNegocio(); renderOrder();
   turns.push({ role: 'user', content: texto + (img ? (texto ? ' ' : '') + '[El cliente adjuntó una imagen en este mensaje]' : '') + stateText() });
@@ -1202,8 +1225,9 @@ async function enviar(texto, img) {
   if (img) opts.images = img;
   try {
     const res = await sample(turns.slice(-16), opts);
-    out.classList.remove('escribiendo'); out.textContent = res.text; turns.push({ role: 'assistant', content: res.text });
+    out.classList.remove('escribiendo'); out.textContent = res.text; turns.push({ role: 'assistant', content: res.text }); pintarBotones();
   } catch (err) {
+    botonesPendientes = []; botonesOfrecidos = [];
     if (err && err.text) { out.classList.remove('escribiendo'); out.textContent = err.text; turns.push({ role: 'assistant', content: err.text }); } else out.remove();
     const code = err && err.code;
     if (GONE.includes(code)) agentGone(); else if (code !== 'cancelled') bubble('error', ERR[code] || ERR.upstream_error);
