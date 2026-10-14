@@ -1,4 +1,4 @@
-import { CATALOGO, METODOS_PAGO, totales, horario, cargarNegocio } from "../lib/comun.js";
+import { CATALOGO, METODOS_PAGO, totales, horario, cargarNegocio, revisarProgramado, momentoDe } from "../lib/comun.js";
 import { exigirSesion } from "../lib/usuarios.js";
 import { listarPedidos, leerPedido, guardarPedido, borrarPedido } from "../lib/store.js";
 import { avisoDeTienda } from "../lib/conversacion.js";
@@ -23,7 +23,10 @@ function pedidoLimpio(entrada, anterior) {
     items.push({ sku: String(it.sku), name: producto.nombre, price: producto.precio, qty });
   }
   if (!items.length && entrada.status !== "armando") return null;
-  const { total } = totales(items);
+  // La hora programada la revisa el servidor: si no sirve, el pedido queda para entrega inmediata.
+  const revisado = entrada.programado?.ts ? revisarProgramado(entrada.programado.ts) : null;
+  const programado = revisado && !revisado.error ? revisado : null;
+  const { total } = totales(items, momentoDe({ programado }));
   const pago = METODOS_PAGO.includes(entrada.pago) ? entrada.pago : "";
   const direccion = texto(entrada.direccion, 160);
   const pagaCon = Math.max(0, Math.floor(Number(entrada.pagaCon) || 0));
@@ -38,7 +41,8 @@ function pedidoLimpio(entrada, anterior) {
     pago,
     pagaCon: pago === "Contraentrega" ? pagaCon : 0,
     // Fuera del horario de domicilios queda como encargo; lo decide la hora del servidor, no la página.
-    encargo: anterior?.encargo || (entrada.status === "armando" ? "" : horario().encargo),
+    programado,
+    encargo: entrada.status === "armando" ? "" : programado ? `Programado: ${programado.fijo}` : anterior?.encargo || horario().encargo,
     status: entrada.status,
     items,
     total,

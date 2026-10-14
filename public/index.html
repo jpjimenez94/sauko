@@ -909,24 +909,41 @@ newOrder();
 // Lo que la página necesita del negocio en este momento (/api/config). El costo del domicilio y si
 // hay servicio dependen de la hora, así que se vuelve a pedir antes de cada mensaje y al cerrar.
 let NEGOCIO = { costoDomicilio: 2000, datosTransferencia: '', notaHorario: '', encargo: '' };
+let DOMICILIOS = { desde: 9, normalHasta: 21, hasta: 22, costo: 2000, costoPrime: 4000 };
 async function cargarNegocio() {
   try {
     const c = await fetch('/api/config').then(r => r.json());
     const h12 = n => (n % 12 || 12) + (n % 24 < 12 ? ' a.m.' : ' p.m.');
     if (c && c.domicilios && $('local-horario')) $('local-horario').textContent = 'Domicilios de ' + h12(c.domicilios.desde) + ' a ' + h12(c.domicilios.hasta);
+    if (c && c.domicilios && c.domicilios.costo != null) DOMICILIOS = c.domicilios;
     if (c && Number(c.costoDomicilio) >= 0) NEGOCIO = { costoDomicilio: Number(c.costoDomicilio), datosTransferencia: String(c.datosTransferencia || ''), notaHorario: String(c.notaHorario || ''), encargo: String(c.encargo || '') };
   } catch (e) {}
 }
+// Entrega programada: mismas reglas que el servidor, que las vuelve a revisar al guardar el pedido.
+const CALI = 5 * 3600000;
+const fechaCali = f => new Date(f.getTime() - CALI).toISOString().slice(0, 10);
+function programar(dia, hora) {
+  const m = /^(\d{1,2})(?::(\d{2}))?$/.exec(String(hora || '').trim());
+  if (!m || Number(m[1]) > 23 || Number(m[2] || 0) > 59) return { error: 'La hora de entrega debe venir en formato de 24 horas, por ejemplo "21:30".' };
+  const ahora = new Date(), partes = fechaCali(ahora).split('-').map(Number), h = Number(m[1]), min = Number(m[2] || 0), h12 = n => (n % 12 || 12) + (n % 24 < 12 ? ' a.m.' : ' p.m.');
+  const ts = Date.UTC(partes[0], partes[1] - 1, partes[2] + (/ma[ñn]ana/i.test(String(dia || '')) ? 1 : 0), h + 5, min);
+  if (h < DOMICILIOS.desde || h >= DOMICILIOS.hasta) return { error: 'A esa hora no hay domicilios. Las entregas se programan entre las ' + h12(DOMICILIOS.desde) + ' y las ' + h12(DOMICILIOS.hasta) };
+  if (ts < ahora.getTime() + 15 * 60000) return { error: 'Esa hora ya pasó o es en menos de 15 minutos. Si es para ya, no se programa: el pedido sale de inmediato.' };
+  if (ts > ahora.getTime() + 48 * 3600000) return { error: 'Solo se programan entregas para hoy o para mañana.' };
+  return { ts, hora: h, texto: (fechaCali(new Date(ts)) === fechaCali(ahora) ? 'hoy' : 'mañana') + ' a las ' + (h % 12 || 12) + ':' + String(min).padStart(2, '0') + (h < 12 ? ' a.m.' : ' p.m.') };
+}
+// El domicilio de un pedido programado se cobra según la franja de esa hora.
+const domicilioDe = o => o && o.programado ? (o.programado.hora >= DOMICILIOS.normalHasta ? DOMICILIOS.costoPrime : DOMICILIOS.costo) : NEGOCIO.costoDomicilio;
 function totals(items) {
   const subtotal = items.reduce((s, i) => s + i.qty * (i.price != null ? i.price : BY_SKU.get(i.sku).price), 0);
-  const domicilio = subtotal === 0 ? 0 : NEGOCIO.costoDomicilio;
+  const domicilio = subtotal === 0 ? 0 : domicilioDe(order);
   return { subtotal, domicilio, total: subtotal + domicilio };
 }
 function snapshot(o) {
-  return { id: o.id, no: o.no, canal: 'Web', direccion: o.direccion, pago: o.pago, pagaCon: o.pagaCon, status: o.status, total: totals(o.items).total, proof: o.proof, proofMonto: o.proofMonto, rechazo: o.rechazo, hora: o.hora,
+  return { id: o.id, no: o.no, canal: 'Web', direccion: o.direccion, pago: o.pago, pagaCon: o.pagaCon, status: o.status, total: totals(o.items).total, proof: o.proof, proofMonto: o.proofMonto, rechazo: o.rechazo, hora: o.hora, programado: o.programado ? { ts: o.programado.ts } : null,
     items: o.items.map(i => { const p = BY_SKU.get(i.sku); return { sku: i.sku, name: p.name, price: p.price, qty: i.qty }; }) };
 }
-const SHOP_MSG = { alistando: o => 'Pago confirmado. Ya estamos alistando tu pedido #' + o.no + ' y llega en máximo 10 minutos.',
+const SHOP_MSG = { alistando: o => order.programado ? 'Pago confirmado. Tu pedido #' + o.no + ' queda programado para ' + order.programado.texto + '.' : 'Pago confirmado. Ya estamos alistando tu pedido #' + o.no + ' y llega en máximo 10 minutos.',
   esperando_pago: o => 'No pudimos confirmar el pago del pedido #' + o.no + '. ¿Nos envías de nuevo el comprobante, por favor?',
   en_camino: o => 'Veci, tu pedido #' + o.no + ' ya va en camino.', entregado: () => 'Pedido entregado. Gracias por comprar en Sauko Store.' };
 async function sync() {
@@ -959,7 +976,7 @@ function renderOrder() {
     const menos = h('button', { type: 'button', 'aria-label': 'Quitar uno', disabled: !open }, '−'), mas = h('button', { type: 'button', 'aria-label': 'Agregar uno', disabled: !open }, '+');
     menos.onclick = () => setQty(i.sku, i.qty - 1); mas.onclick = () => setQty(i.sku, i.qty + 1);
     return h('div', { class: 'pedido__linea' }, h('span', null, p.name), h('span', { class: 'cant num' }, menos, String(i.qty), mas), h('span', { class: 'num' }, pesos(i.qty * p.price))); }));
-  $('pedido-meta').textContent = units ? 'Domicilio: ' + pesos(t.domicilio) + ' · Entrega: ' + (order.direccion || 'por confirmar') + ' · Pago: ' + (order.pago || 'por confirmar') : 'Toca el más en un producto o pídelo por aquí.';
+  $('pedido-meta').textContent = units ? 'Domicilio: ' + pesos(t.domicilio) + ' · Entrega: ' + (order.direccion || 'por confirmar') + (order.programado ? ' (' + order.programado.texto + ')' : '') + ' · Pago: ' + (order.pago || 'por confirmar') : 'Toca el más en un producto o pídelo por aquí.';
   const idx = order.status === 'entregado' ? STEPS.length : STEPS.findIndex(s => s[0] === order.status);
   $('etapas').replaceChildren(...STEPS.map(([, label], i) => h('div', { class: 'etapa ' + (i < idx ? 'hecha' : i === idx ? 'ahora' : '') }, label)));
   pintarEstado();
@@ -1098,7 +1115,8 @@ const TOOLS = [
     description: 'Reemplaza el pedido completo del cliente con la lista de items dada (estado absoluto, no incremental) y opcionalmente guarda dirección y método de pago. Devuelve el pedido con subtotal, domicilio, total y problemas de existencias.',
     inputSchema: { type: 'object', properties: {
       items: { type: 'array', items: { type: 'object', properties: { sku: { type: 'string' }, cantidad: { type: 'integer' } }, required: ['sku', 'cantidad'] } },
-      direccion: { type: 'string', description: 'Conjunto o unidad, torre y apartamento o casa' }, metodo_pago: { type: 'string', enum: ['Transferencia', 'Contraentrega'] } }, required: ['items'] },
+      direccion: { type: 'string', description: 'Conjunto o unidad, torre y apartamento o casa' }, metodo_pago: { type: 'string', enum: ['Transferencia', 'Contraentrega'] },
+      entrega_dia: { type: 'string', enum: ['hoy', 'mañana'], description: 'Solo si el cliente pidió una hora de entrega: el día' }, entrega_hora: { type: 'string', description: 'Solo si el cliente pidió una hora de entrega: en 24 horas, por ejemplo "21:30". Con "ya" se quita la hora y vuelve a entrega inmediata.' } }, required: ['items'] },
     execute(input) {
       if (CLOSED.includes(order.status)) newOrder();
       const problemas = [], items = [];
@@ -1113,9 +1131,12 @@ const TOOLS = [
       order.items = items; order.status = 'armando';
       if (input.direccion) order.direccion = String(input.direccion).slice(0, 160);
       if (['Transferencia', 'Contraentrega'].includes(input.metodo_pago)) order.pago = input.metodo_pago;
+      // Entrega programada: "ya" la quita; una hora la fija si está dentro del horario.
+      if (/^(ya|ahora|inmediat)/i.test(String(input.entrega_hora || '').trim())) order.programado = null;
+      else if (input.entrega_hora) { const prog = programar(input.entrega_dia, input.entrega_hora); if (prog.error) problemas.push(prog.error); else order.programado = prog; }
       renderOrder(); sync(); $('pedido-caja').open = true;
       const t = totals(items); log('Actualizó el pedido #' + order.no + ': ' + items.reduce((s, i) => s + i.qty, 0) + ' unidades, total ' + pesos(t.total));
-      return { items: items.map(i => { const p = BY_SKU.get(i.sku); return { sku: i.sku, nombre: p.name, cantidad: i.qty, precio: p.price }; }), ...t, direccion: order.direccion || null, metodo_pago: order.pago || null, problemas };
+      return { items: items.map(i => { const p = BY_SKU.get(i.sku); return { sku: i.sku, nombre: p.name, cantidad: i.qty, precio: p.price }; }), ...t, entrega_programada: order.programado ? order.programado.texto : null, direccion: order.direccion || null, metodo_pago: order.pago || null, problemas };
     } },
   { name: 'cerrar_pedido',
     description: 'Cierra el pedido cuando el cliente confirmó productos, dirección y forma de pago. Con Transferencia lo deja esperando el comprobante y devuelve los datos de la cuenta. Con Contraentrega lo envía a la tienda para alistar y devuelve la devuelta; exige paga_con.',
@@ -1126,9 +1147,12 @@ const TOOLS = [
       if (CLOSED.includes(order.status)) throw new Error('Ese pedido ya está en la tienda');
       // El total y si es encargo quedan fijos con la hora en que se cierra.
       await cargarNegocio();
-      const o = order, total = totals(o.items).total;
-      const entrega = NEGOCIO.encargo ? 'Es un encargo: ' + NEGOCIO.encargo.replace('Encargo: ', '') + '. No prometas entrega antes.' : 'Llega en máximo 10 minutos.';
-      o.encargo = NEGOCIO.encargo;
+      const o = order;
+      // La hora programada se revisa otra vez al cerrar, por si ya pasó mientras armaban el pedido.
+      if (o.programado && o.programado.ts < Date.now() + 15 * 60000) throw new Error('La hora programada ya pasó o es en menos de 15 minutos. Pídele otra hora al cliente o deja el pedido para entrega inmediata.');
+      const total = totals(o.items).total;
+      const entrega = o.programado ? 'La entrega quedó programada para ' + o.programado.texto + '. No prometas entrega antes de esa hora.' : NEGOCIO.encargo ? 'Es un encargo: ' + NEGOCIO.encargo.replace('Encargo: ', '') + '. No prometas entrega antes.' : 'Llega en máximo 10 minutos.';
+      o.encargo = o.programado ? 'Programado: ' + o.programado.texto : NEGOCIO.encargo;
       if (o.pago === 'Contraentrega') {
         const billete = Math.floor(Number(input.paga_con) || 0);
         if (billete < total) throw new Error('Falta saber con cuánto paga el cliente; debe ser al menos ' + total + '. Pregúntale con qué billete paga.');
@@ -1172,7 +1196,7 @@ function pintarBotones(respuesta) {
   mensajes.append(fila); botonesPendientes = [];
 }
 function stateText() {
-  return '\n\n[Estado del pedido en pantalla #' + order.no + ': ' + JSON.stringify({ estado: order.status, items: order.items.map(i => ({ sku: i.sku, nombre: BY_SKU.get(i.sku).name, cantidad: i.qty })), ...totals(order.items), direccion: order.direccion || null, metodo_pago: order.pago || null }) + (NEGOCIO.notaHorario ? '. ' + NEGOCIO.notaHorario : '') + (botonesOfrecidos.length ? ' Botones que le ofreciste en tu mensaje anterior: ' + botonesOfrecidos.join(' | ') + '.' : '') + ']';
+  return '\n\n[Estado del pedido en pantalla #' + order.no + ': ' + JSON.stringify({ estado: order.status, items: order.items.map(i => ({ sku: i.sku, nombre: BY_SKU.get(i.sku).name, cantidad: i.qty })), ...totals(order.items), entrega_programada: order.programado ? order.programado.texto : null, direccion: order.direccion || null, metodo_pago: order.pago || null }) + (NEGOCIO.notaHorario ? '. ' + NEGOCIO.notaHorario : '') + (botonesOfrecidos.length ? ' Botones que le ofreciste en tu mensaje anterior: ' + botonesOfrecidos.join(' | ') + '.' : '') + ']';
 }
 const ERR = { rate_limited: 'Hay muchas solicitudes seguidas. Espera un momento y vuelve a enviar.', session_expired: 'Tu sesión venció. Inicia sesión de nuevo.',
   image_rejected: 'No se pudo leer esa imagen. Prueba con otra foto (JPG o PNG).', refused: 'El asistente no pudo responder ese mensaje. Escríbelo de otra forma.',
