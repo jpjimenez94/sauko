@@ -973,7 +973,8 @@ function programar(dia, hora) {
   return { ts, hora: h, texto: (fechaCali(new Date(ts)) === fechaCali(ahora) ? 'hoy' : 'mañana') + ' a las ' + (h % 12 || 12) + ':' + String(min).padStart(2, '0') + (h < 12 ? ' a.m.' : ' p.m.') };
 }
 // El domicilio de un pedido programado se cobra según la franja de esa hora.
-const domicilioDe = o => o && o.programado ? (o.programado.hora >= DOMICILIOS.normalHasta ? DOMICILIOS.costoPrime : DOMICILIOS.costo) : NEGOCIO.costoDomicilio;
+// Cerrado el pedido, el domicilio queda fijo: que pase la hora no le cambia la tarifa al cliente.
+const domicilioDe = o => o && o.domicilioFijo != null ? o.domicilioFijo : o && o.programado ? (o.programado.hora >= DOMICILIOS.normalHasta ? DOMICILIOS.costoPrime : DOMICILIOS.costo) : NEGOCIO.costoDomicilio;
 function totals(items) {
   const subtotal = items.reduce((s, i) => s + i.qty * (i.price != null ? i.price : BY_SKU.get(i.sku).price), 0);
   const domicilio = subtotal === 0 ? 0 : domicilioDe(order);
@@ -1172,8 +1173,9 @@ const TOOLS = [
       if (input.direccion) order.direccion = String(input.direccion).slice(0, 160);
       if (['Transferencia', 'Contraentrega'].includes(input.metodo_pago)) order.pago = input.metodo_pago;
       // Entrega programada: "ya" la quita; una hora la fija si está dentro del horario.
-      if (/^(ya|ahora|inmediat)/i.test(String(input.entrega_hora || '').trim())) order.programado = null;
-      else if (input.entrega_hora) { const prog = programar(input.entrega_dia, input.entrega_hora); if (prog.error) problemas.push(prog.error); else order.programado = prog; }
+      // Cambiar la hora de entrega sí cambia la tarifa; lo demás no toca la que ya quedó fija al cerrar.
+      if (/^(ya|ahora|inmediat)/i.test(String(input.entrega_hora || '').trim())) { order.programado = null; order.domicilioFijo = null; }
+      else if (input.entrega_hora) { const prog = programar(input.entrega_dia, input.entrega_hora); if (prog.error) problemas.push(prog.error); else { order.programado = prog; order.domicilioFijo = null; } }
       renderOrder(); sync(); $('pedido-caja').open = true;
       const t = totals(items); log('Actualizó el pedido #' + order.no + ': ' + items.reduce((s, i) => s + i.qty, 0) + ' unidades, total ' + pesos(t.total));
       return { items: items.map(i => { const p = BY_SKU.get(i.sku); return { sku: i.sku, nombre: p.name, cantidad: i.qty, precio: p.price }; }), ...t, entrega_programada: order.programado ? order.programado.texto : null, direccion: order.direccion || null, metodo_pago: order.pago || null, problemas };
@@ -1190,7 +1192,7 @@ const TOOLS = [
       const o = order;
       // La hora programada se revisa otra vez al cerrar, por si ya pasó mientras armaban el pedido.
       if (o.programado && o.programado.ts < Date.now() + 15 * 60000) throw new Error('La hora programada ya pasó o es en menos de 15 minutos. Pídele otra hora al cliente o deja el pedido para entrega inmediata.');
-      const total = totals(o.items).total;
+      const total = totals(o.items).total; o.domicilioFijo = totals(o.items).domicilio;
       const entrega = o.programado ? 'La entrega quedó programada para ' + o.programado.texto + '. No prometas entrega antes de esa hora.' : NEGOCIO.encargo ? 'Es un encargo: ' + NEGOCIO.encargo.replace('Encargo: ', '') + '. No prometas entrega antes.' : 'Llega en máximo 10 minutos.';
       o.encargo = o.programado ? 'Programado: ' + o.programado.texto : NEGOCIO.encargo;
       if (o.pago === 'Contraentrega') {

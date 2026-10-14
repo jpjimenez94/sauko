@@ -27,7 +27,12 @@ function pedidoLimpio(entrada, anterior) {
   // La hora programada la revisa el servidor: si no sirve, el pedido queda para entrega inmediata.
   const revisado = entrada.programado?.ts ? revisarProgramado(entrada.programado.ts) : null;
   const programado = revisado && !revisado.error ? revisado : null;
-  const { total } = totales(items, momentoDe({ programado }));
+  // La tarifa del domicilio queda fija desde que el cliente cierra el pedido: mandar el comprobante en
+  // otra franja horaria no la cambia. Solo cambia si pide otra hora de entrega.
+  const calculado = totales(items, momentoDe({ programado }));
+  const mismaHora = (anterior?.programado?.ts ?? 0) === (programado?.ts ?? 0);
+  const domicilio = !items.length ? 0 : (mismaHora ? anterior?.domicilioFijo : undefined) ?? calculado.domicilio;
+  const total = calculado.subtotal + domicilio;
   const pago = METODOS_PAGO.includes(entrada.pago) ? entrada.pago : "";
   const direccion = texto(entrada.direccion, 160);
   const pagaCon = Math.max(0, Math.floor(Number(entrada.pagaCon) || 0));
@@ -43,6 +48,7 @@ function pedidoLimpio(entrada, anterior) {
     pagaCon: pago === "Contraentrega" ? pagaCon : 0,
     // Fuera del horario de domicilios queda como encargo; lo decide la hora del servidor, no la página.
     programado,
+    domicilioFijo: entrada.status === "armando" ? (mismaHora ? anterior?.domicilioFijo : undefined) : domicilio,
     encargo: entrada.status === "armando" ? "" : programado ? `Programado: ${programado.fijo}` : anterior?.encargo || horario().encargo,
     status: entrada.status,
     items,
