@@ -888,6 +888,34 @@ function pedidoGenerico(consulta) {
   const familia = GENERICOS.find(([claves]) => palabras.every(t => claves.includes(t)));
   return familia ? { pedido_generico: true, tipos: familia[1], instruccion: 'El cliente no dijo qué producto quiere. No ofrezcas productos todavía: pregúntale qué tipo busca y ofrécele estos tipos con ofrecer_botones. Cuando elija uno, búscalo con esa palabra.' } : null;
 }
+// Para acompañar: qué ofrecerle al cliente según lo que lleva. Cada regla es
+// [lo que dispara la sugerencia, qué buscar para ofrecer, cómo decirlo]. Gana la primera regla que
+// coincida con algo del pedido y cuyo acompañante no esté ya en él.
+const ACOMPANAR = [
+  [/ (cerveza|aguardiente|ron|whisky|vodka|tequila|vino|refajo) /, ['papa', 'mani'], 'algo de picar para acompañar'],
+  [/ (papa|papas|doritos|detodito|cheetos|mani|manimoto|chocolatina|galleta|galletas|goma|gomas|natuchips|choclitos|tostacos|margarita|rizadas|patacon|golpe|popetas) /, ['gaseosa', 'jugo'], 'algo de tomar para acompañar'],
+  [/ (pollo|carne|cerdo|costilla|pechuga|chorizo|tocineta) /, ['arroz', 'aceite'], 'algo para la preparación'],
+  [/ (arroz|frijol|frijoles|lenteja|lentejas|pasta|spaguetti|spaghetti) /, ['aceite', 'atun'], 'algo para completar la comida'],
+  [/ (pan|arepa|arepas|tostada|tostadas) /, ['queso', 'mantequilla'], 'algo para acompañar el pan o la arepa'],
+  [/ (huevo|huevos) /, ['pan', 'arepa'], 'algo para acompañar los huevos'],
+  [/ (leche|cafe|chocolate|milo|chocolisto) /, ['pan', 'galleta'], 'algo para acompañar'],
+  [/ (gaseosa|jugo|coca|pepsi|sprite|colombiana|postobon|quatro) /, ['papa', 'chocolatina'], 'algo de picar para acompañar'],
+  [/ panal (winny|huggies|pequenin|piscina) /, ['panitos'], 'pañitos para el bebé'],
+  [/ (whiskas|donkat|felix|gato|gatos|cat chow|gatitos) /, ['arena'], 'arena para el gato'],
+  [/ (detergente|jabon|blanqueador|suavizante|fabuloso|lavaloza) /, ['esponja', 'papel higienico'], 'algo más para el aseo'],
+  [/ (cigarrillo|cigarrillos) /, ['encendedor'], 'un encendedor'],
+];
+function paraAcompanar(items) {
+  const nombres = items.map(i => ' ' + norm(BY_SKU.get(i.sku).name) + ' '), enPedido = new Set(items.map(i => i.sku));
+  for (const [dispara, ofrecer, frase] of ACOMPANAR) {
+    if (!nombres.some(n => dispara.test(n))) continue;
+    if (ofrecer.some(q => nombres.some(n => n.includes(' ' + q)))) return null;
+    const productos = ofrecer.map(q => search(q).find(p => avail(p) > 0 && !enPedido.has(p.sku))).filter(Boolean).slice(0, 2);
+    if (productos.length) return { ofrecer: frase, productos: productos.map(p => ({ sku: p.sku, nombre: p.name, precio: p.price })),
+      instruccion: 'Propónselo ahora, una sola vez y en una frase natural que conecte con lo que lleva. Usa ofrecer_botones con estos productos (título = nombre completo, detalle = precio, corto = nombre abreviado) y una última opción "No, gracias". Si dice que no o no responde a eso, sigue con el pedido y no vuelvas a ofrecer acompañantes.' };
+  }
+  return null;
+}
 function search(q, k = 8, pool = CAT) {
   const qt = norm(q).split(' ').filter(Boolean).map(t => t.length > 4 && t.endsWith('s') ? t.slice(0, -1) : t);
   if (!qt.length) return [];
@@ -1176,9 +1204,11 @@ const TOOLS = [
       // Cambiar la hora de entrega sí cambia la tarifa; lo demás no toca la que ya quedó fija al cerrar.
       if (/^(ya|ahora|inmediat)/i.test(String(input.entrega_hora || '').trim())) { order.programado = null; order.domicilioFijo = null; }
       else if (input.entrega_hora) { const prog = programar(input.entrega_dia, input.entrega_hora); if (prog.error) problemas.push(prog.error); else { order.programado = prog; order.domicilioFijo = null; } }
+      // Una sola vez por pedido se propone algo que acompañe lo que lleva.
+      const acompanar = order.sugerido || !items.length ? null : paraAcompanar(items); if (acompanar) order.sugerido = true;
       renderOrder(); sync(); $('pedido-caja').open = true;
       const t = totals(items); log('Actualizó el pedido #' + order.no + ': ' + items.reduce((s, i) => s + i.qty, 0) + ' unidades, total ' + pesos(t.total));
-      return { items: items.map(i => { const p = BY_SKU.get(i.sku); return { sku: i.sku, nombre: p.name, cantidad: i.qty, precio: p.price }; }), ...t, entrega_programada: order.programado ? order.programado.texto : null, direccion: order.direccion || null, metodo_pago: order.pago || null, problemas };
+      return { items: items.map(i => { const p = BY_SKU.get(i.sku); return { sku: i.sku, nombre: p.name, cantidad: i.qty, precio: p.price }; }), ...t, entrega_programada: order.programado ? order.programado.texto : null, direccion: order.direccion || null, metodo_pago: order.pago || null, problemas, ...(acompanar ? { para_acompanar: acompanar } : {}) };
     } },
   { name: 'cerrar_pedido',
     description: 'Cierra el pedido cuando el cliente confirmó productos, dirección y forma de pago. Con Transferencia lo deja esperando el comprobante y devuelve los datos de la cuenta. Con Contraentrega lo envía a la tienda para alistar y devuelve la devuelta; exige paga_con.',
