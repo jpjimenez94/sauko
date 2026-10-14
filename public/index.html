@@ -1155,7 +1155,10 @@ const TOOLS = [
 ];
 // Botones de respuesta rápida: el asistente los pide con ofrecer_botones y salen debajo de su mensaje.
 let botonesPendientes = [], botonesOfrecidos = [];
-function pintarBotones() {
+const PREGUNTA_PAGO = /c[oó]mo[^.?!]{0,40}\bpag(ar|[aá]s|a)\b[^.!]*\?|forma de pago[^.!]*\?|m[eé]todo de pago[^.!]*\?/i;
+function pintarBotones(respuesta) {
+  // La forma de pago siempre va con botones, aunque el modelo haya olvidado pedirlos.
+  if (!botonesPendientes.length && order.status === 'armando' && order.items.length && !order.pago && PREGUNTA_PAGO.test(respuesta || '')) botonesPendientes = ['Transferencia', 'Contraentrega'].map(titulo => ({ titulo, detalle: '' }));
   botonesOfrecidos = botonesPendientes.map(b => [b.titulo, b.detalle].filter(Boolean).join(' · '));
   if (!botonesPendientes.length) return;
   const fila = h('div', { class: 'msg-botones' }, ...botonesPendientes.map(b => { const texto = [b.titulo, b.detalle].filter(Boolean).join(' · ');
@@ -1180,7 +1183,7 @@ async function sampleApi(turnos, opts) {
     if (!url) throw { code: 'image_rejected' };
     ultimo.content = [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: url.split(',')[1] } }, { type: 'text', text: ultimo.content }];
   }
-  let texto = '';
+  let texto = '', textoPrevio = '';
   for (let ronda = 0; ronda < 6; ronda++) {
     let d;
     try { d = await pedir('/api/chat', { method: 'POST', body: JSON.stringify({ mensajes }) }); }
@@ -1198,8 +1201,11 @@ async function sampleApi(turnos, opts) {
       catch (e) { return { type: 'tool_result', tool_use_id: uso.id, content: 'Error: ' + e.message, is_error: true }; }
     }));
     // Los bloques de Claude vuelven tal cual, incluido su razonamiento, y se agregan al final.
+    // Hay modelos que escriben la respuesta junto con la llamada a la herramienta y luego no agregan nada.
+    textoPrevio = d.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim() || textoPrevio;
     mensajes.push({ role: 'assistant', content: d.content }, { role: 'user', content: resultados });
   }
+  if (!texto && textoPrevio) { texto = textoPrevio; if (opts.onText) opts.onText({ text: texto }); }
   if (!texto) throw { code: 'empty_completion' };
   return { text: texto };
 }
@@ -1243,7 +1249,7 @@ async function enviar(texto, img) {
   if (img) opts.images = img;
   try {
     const res = await sample(turns.slice(-16), opts);
-    out.classList.remove('escribiendo'); out.textContent = res.text; turns.push({ role: 'assistant', content: res.text }); pintarBotones();
+    out.classList.remove('escribiendo'); out.textContent = res.text; turns.push({ role: 'assistant', content: res.text }); pintarBotones(res.text);
   } catch (err) {
     botonesPendientes = []; botonesOfrecidos = [];
     if (err && err.text) { out.classList.remove('escribiendo'); out.textContent = err.text; turns.push({ role: 'assistant', content: err.text }); } else out.remove();
