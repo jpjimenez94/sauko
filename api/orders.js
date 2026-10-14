@@ -3,6 +3,7 @@ import { exigirSesion } from "../lib/usuarios.js";
 import { listarPedidos, leerPedido, guardarPedido, borrarPedido } from "../lib/store.js";
 import { avisoDeTienda } from "../lib/conversacion.js";
 import { enviarTexto } from "../lib/whatsapp.js";
+import { avisarEntrega } from "../lib/opiniones.js";
 
 // Estados que puede poner la página del cliente y estados que solo mueve el panel.
 // "alistando" solo lo puede poner el cliente cuando paga contraentrega: no hay pago que confirmar.
@@ -86,7 +87,8 @@ export default async function handler(req, res) {
       await guardarPedido(pedido);
       // Si el pedido llegó por WhatsApp, el aviso le sale al cliente por ese mismo chat.
       const aviso = await avisoDeTienda(pedido);
-      if (aviso) await enviarTexto(pedido.cliente, aviso);
+      if (aviso && estado === "entregado") await avisarEntrega(pedido, aviso);
+      else if (aviso) await enviarTexto(pedido.cliente, aviso);
       return res.status(200).json({ ok: true });
     }
 

@@ -10,6 +10,9 @@ function resumenDeIA(credito, consumo) {
   const porMensaje = consumo.mensajesMes > 0 ? consumo.mes / consumo.mensajesMes : null;
   return {
     modelo: modeloEnUso(),
+    // El que contestó de verdad la última vez, según la respuesta de Anthropic, y cuándo.
+    modeloReal: consumo.modelo,
+    respondio: consumo.respondio,
     saldo,
     minimo: credito?.minimo ?? 0,
     saldoBajo: saldo !== null && saldo <= (credito?.minimo ?? 0),

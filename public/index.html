@@ -606,6 +606,7 @@ input { font: inherit; color: inherit; }
         <div class="kpi kpi--ventas"><strong id="k-ventas">$0</strong><span>Vendido en pedidos</span></div>
       </section>
       <div class="aviso-stock" id="aviso-ia" role="alert" hidden></div>
+      <div class="aviso-stock" id="aviso-opiniones" role="alert" hidden></div>
       <div class="aviso-stock" id="aviso-stock" role="status" hidden></div>
       <p class="intro">El asistente ya armó el pedido y leyó el comprobante. Aquí se confirma el pago, se alista y se despacha; cada toque le avisa al cliente por el chat.</p>
       <div class="tablero" id="tablero"></div>
@@ -634,6 +635,16 @@ input { font: inherit; color: inherit; }
         <section class="caja"><h2>De dónde llegan</h2><div id="r-canal"></div></section>
       </div>
       <p class="vacio">Las ventas salen de los pedidos con pago confirmado en este panel.</p>
+      <section class="caja">
+        <h2>Cómo les fue a los clientes</h2>
+        <div class="kpis">
+          <div class="kpi"><strong id="op-bien">0</strong><span>Rápido y completo</span></div>
+          <div class="kpi"><strong id="op-regular">0</strong><span>Bien, pero demoró</span></div>
+          <div class="kpi"><strong id="op-mal">0</strong><span>Algo falló</span></div>
+        </div>
+        <div class="bitacora__lista" id="op-lista"></div>
+        <p class="vacio">Al entregar un pedido de WhatsApp se le pregunta al cliente cómo le fue, máximo una vez cada 15 días por cliente. Cuentan las respuestas de los últimos 30 días.</p>
+      </section>
     </div>
 
     <div class="vista" id="pest-inventario" hidden>
@@ -1354,7 +1365,7 @@ function sesionAbierta(usuario) {
   for (const f of ['login-form', 'primer-form']) $(f).reset();
   $('login-error').textContent = ''; $('primer-error').textContent = '';
   if (store) { store.traerPedidos(); store.inventario().catch(() => {}); }
-  cargarAjustes(); cargarSolicitados();
+  cargarAjustes(); cargarSolicitados(); cargarOpiniones();
 }
 async function revisarSesion() {
   try { sesionAbierta((await pedir('/api/sesion')).usuario); }
@@ -1486,6 +1497,22 @@ function verPestana(nombre) {
   if (nombre === 'usuarios') cargarUsuarios();
   if (nombre === 'ajustes') cargarAjustes();
   if (nombre === 'solicitados') cargarSolicitados();
+  if (nombre === 'resumen') cargarOpiniones();
+}
+
+/* Opiniones: lo que respondieron los clientes al entregarles el pedido */
+function cargarOpiniones() {
+  return pedir('/api/solicitados?opiniones=1').then(d => {
+    const todas = d.opiniones || [], recientes = todas.filter(o => Date.now() - o.hora < 30 * 86400000);
+    for (const nota of ['bien', 'regular', 'mal']) $('op-' + nota).textContent = recientes.filter(o => o.nota === nota).length;
+    const cuando = o => new Date(o.hora).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const visto = o => { const b = h('button', { class: 'mini', type: 'button' }, 'Ya lo revisé'); b.onclick = () => pedir('/api/solicitados?opiniones=1', { method: 'PATCH', body: JSON.stringify({ id: o.id }) }).then(cargarOpiniones).catch(() => {}); return b; };
+    $('op-lista').replaceChildren(...(todas.length ? todas.slice(0, 40).map(o => h('div', null, h('time', null, cuando(o)), h('span', null, 'Pedido #' + o.no + ' · ' + o.respuesta + (o.comentario ? ': "' + o.comentario + '"' : '') + (o.nota === 'mal' ? ' · +' + String(o.cliente || '').replace(/^[+]/, '') : '')))) : [h('p', { class: 'vacio' }, 'Todavía no hay respuestas.')]));
+    // Lo que falló y nadie ha revisado sale arriba de los pedidos, con el número del cliente para llamarlo.
+    const pendientes = todas.filter(o => o.nota === 'mal' && !o.atendida), caja = $('aviso-opiniones');
+    caja.hidden = !pendientes.length;
+    caja.replaceChildren(...pendientes.map(o => h('p', null, h('b', null, 'Un cliente dijo que algo falló con el pedido #' + o.no + '. '), (o.comentario ? '"' + o.comentario + '" ' : 'Todavía no ha contado qué pasó. ') + 'WhatsApp: +' + String(o.cliente || '').replace(/^[+]/, '') + ' ', visto(o))));
+  }).catch(() => {});
 }
 
 /* Solicitados: lo que piden los clientes y no está en el catálogo */
@@ -1564,14 +1591,14 @@ function pintarIA(a) {
   $('ia-saldo').textContent = ia.saldo == null ? 'Sin cuadrar' : usd(ia.saldo);
   $('ia-hoy').textContent = usd(ia.hoy); $('ia-mes').textContent = usd(ia.mes);
   $('ia-alcanza').textContent = ia.alcanzaPara == null ? '—' : ia.alcanzaPara.toLocaleString('es-CO');
-  $('ia-detalle').textContent = 'Modelo: ' + ia.modelo + ' · Mensajes atendidos hoy: ' + ia.mensajesHoy + ', este mes: ' + ia.mensajesMes + (ia.porMensaje ? ' · Costo promedio por mensaje: US$' + ia.porMensaje.toFixed(4) : '') + (ia.cuadradoEl ? ' · Saldo cuadrado el ' + new Date(ia.cuadradoEl).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+  $('ia-detalle').textContent = 'Modelo configurado: ' + ia.modelo + (ia.modeloReal ? ' · Última respuesta: ' + ia.modeloReal + ', ' + new Date(ia.respondio).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ' · Todavía no ha respondido desde el último cambio') + ' · Mensajes atendidos hoy: ' + ia.mensajesHoy + ', este mes: ' + ia.mensajesMes + (ia.porMensaje ? ' · Costo promedio por mensaje: US$' + ia.porMensaje.toFixed(4) : '') + (ia.cuadradoEl ? ' · Saldo cuadrado el ' + new Date(ia.cuadradoEl).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
   if (document.activeElement !== $('ia-minimo') && ia.saldo != null) $('ia-minimo').value = ia.minimo;
 }
 $('ia-form').onsubmit = e => { e.preventDefault();
   pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ credito: { saldo: Number($('ia-saldo-real').value), minimo: Number($('ia-minimo').value) } }) })
     .then(a => { pintarIA(a); $('ia-saldo-real').value = ''; $('ia-estado').textContent = 'Saldo cuadrado. Desde ahora se descuenta lo que gaste el asistente.'; }).catch(err => { $('ia-estado').textContent = err.message; }); };
 // Cada minuto, sin tocar el formulario de ajustes que alguien pueda estar llenando.
-setInterval(() => { if (vistaActual === 'panel' && panelAbierto) pedir('/api/ajustes').then(a => { pintarWhatsApp(a); pintarIA(a); }).catch(() => {}); }, 60000);
+setInterval(() => { if (vistaActual === 'panel' && panelAbierto) { pedir('/api/ajustes').then(a => { pintarWhatsApp(a); pintarIA(a); }).catch(() => {}); cargarOpiniones(); } }, 60000);
 function cargarAjustes() { return pedir('/api/ajustes').then(a => { pintarWhatsApp(a); pintarIA(a); if (a.negocio) pintarAjustes(a.negocio); if (a.promos != null) $('aj-promos').textContent = 'Clientes que autorizaron promociones respondiendo SI PROMOS: ' + a.promos + '.'; }).catch(() => {}); }
 $('aj-form').addEventListener('input', () => { $('aj-estado').textContent = ''; vistaPreviaAjustes(); });
 $('aj-form').onsubmit = e => { e.preventDefault();
