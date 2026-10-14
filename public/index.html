@@ -251,6 +251,17 @@ input { font: inherit; color: inherit; }
 .chat__form button:disabled { opacity: 0.5; cursor: default; }
 
 /* Elegir canal: WhatsApp o el chat de la página (solo en computador) */
+.comprobante__ampliar { position: relative; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 8px; }
+.comprobante__ampliar span { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(38, 21, 95, 0.75); color: #fff; font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0; border-radius: 0 0 8px 8px; }
+.visor { margin: auto; border: 0; padding: 0; width: min(900px, calc(100vw - 1.5rem)); height: calc(100vh - 1.5rem); background: #111; color: #fff; border-radius: 16px; overflow: hidden; }
+.visor[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.visor::backdrop { background: rgba(0, 0, 0, 0.8); }
+.visor__barra { display: flex; gap: 0.6rem 1rem; align-items: center; flex-wrap: wrap; padding: 0.7rem 1rem; background: var(--morado-oscuro); }
+.visor__barra b { flex: 1; min-width: 0; }
+.visor__barra span { font-size: 0.8rem; opacity: 0.8; }
+.visor__marco { overflow: auto; display: grid; place-items: center; }
+.visor__marco img { max-width: 100%; max-height: calc(100vh - 6rem); object-fit: contain; cursor: zoom-in; }
+.visor__marco img.real { max-width: none; max-height: none; cursor: zoom-out; }
 .elegir { margin: auto; border: 0; border-radius: 1.6rem; padding: 2rem; width: min(520px, calc(100vw - 2rem)); background: var(--crema); color: var(--tinta); box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.55); }
 .elegir::backdrop { background: rgba(38, 21, 95, 0.6); }
 .elegir h2 { font-family: var(--display); font-weight: 800; font-size: 1.9rem; line-height: 1; color: var(--morado-oscuro); padding-right: 2rem; }
@@ -523,6 +534,10 @@ input { font: inherit; color: inherit; }
     <span>Pedir domi</span><b id="burbuja-n" hidden>0</b>
   </button>
 
+  <dialog class="visor" id="visor" aria-labelledby="visor-titulo">
+    <div class="visor__barra"><b id="visor-titulo">Comprobante</b><span>Tocá la imagen para acercar</span><button class="btn btn--sol" type="button" id="visor-cerrar">Cerrar</button></div>
+    <div class="visor__marco"><img id="visor-img" alt="Comprobante de pago enviado por el cliente"></div>
+  </dialog>
   <dialog class="elegir" id="elegir" aria-labelledby="elegir-titulo">
     <button class="elegir__cerrar" id="elegir-cerrar" type="button" aria-label="Cerrar">×</button>
     <h2 id="elegir-titulo">¿Por dónde querés pedir?</h2>
@@ -1388,6 +1403,11 @@ $('elegir-whatsapp').onclick = () => { $('elegir').close(); abrirWhatsApp(mensaj
 $('elegir-chat').onclick = () => { eligioChat = true; $('elegir').close(); abrirChat(mensajePendiente); };
 $('elegir-cerrar').onclick = () => $('elegir').close();
 $('elegir').addEventListener('click', e => { if (e.target === $('elegir')) $('elegir').close(); });
+// El visor vive fuera de la tienda: en la vista del panel la tienda está oculta y lo ocultaría con ella.
+document.body.append($('visor'));
+$('visor-cerrar').onclick = () => $('visor').close();
+$('visor').addEventListener('click', e => { if (e.target === $('visor')) $('visor').close(); });
+$('visor-img').onclick = () => $('visor-img').classList.toggle('real');
 document.querySelectorAll('[data-abrir-chat]').forEach(b => b.addEventListener('click', () => pedirDomi(b.dataset.mensaje)));
 
 /* ---------- panel de la tienda ---------- */
@@ -1429,6 +1449,17 @@ $('salir').onclick = () => pedir('/api/sesion', { method: 'DELETE' }).catch(() =
 // Interruptor del asistente de WhatsApp: el administrador lo enciende y lo apaga cuando quiera.
 function pintarWhatsApp(a) { const b = $('wa-interruptor'); b.hidden = false; b.setAttribute('aria-pressed', String(!!a.whatsappActivo)); b.textContent = !a.whatsappConectado ? 'WhatsApp: sin conectar' : a.whatsappActivo ? 'WhatsApp: encendido' : 'WhatsApp: apagado'; b.disabled = !a.whatsappConectado || !YO || YO.rol !== 'admin'; }
 $('wa-interruptor').onclick = () => { const encender = $('wa-interruptor').getAttribute('aria-pressed') !== 'true'; pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ whatsappActivo: encender }) }).then(pintarWhatsApp).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); };
+// Visor del comprobante: la miniatura de la tarjeta se abre a pantalla completa; tocar la imagen
+// alterna entre verla entera y a tamaño real para leer los números.
+function verComprobante(o) {
+  const mini = h('img', { src: o.proof, alt: 'Comprobante del pedido #' + o.no + ' (tocá para ampliar)', title: 'Ver el comprobante en grande' });
+  const abrir = h('button', { class: 'comprobante__ampliar', type: 'button', 'aria-label': 'Ver el comprobante del pedido #' + o.no + ' en grande' }, mini, h('span', null, 'Ver grande'));
+  abrir.onclick = () => {
+    $('visor-titulo').textContent = 'Comprobante del pedido #' + o.no + (o.proofMonto ? ' · el asistente leyó ' + pesos(o.proofMonto) : '');
+    $('visor-img').src = o.proof; $('visor-img').classList.remove('real'); $('visor').showModal();
+  };
+  return abrir;
+}
 function act(o, patch) { store.patch(o.id, patch).then(() => store.inventario()).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); }
 // Pedidos programados: se ordenan por la hora en que hay que despacharlos (15 minutos antes de la
 // entrega) y resaltan cuando ya toca.
@@ -1466,7 +1497,7 @@ function tarjeta(o) {
   const acts = h('div', { class: 'acciones' });
   if (o.status === 'por_confirmar') {
     const covers = (o.proofMonto || 0) >= (o.total || 0);
-    el.append(h('div', { class: 'comprobante' }, o.proof && String(o.proof).startsWith('data:image/') ? h('img', { src: o.proof, alt: 'Comprobante enviado por el cliente' }) : null,
+    el.append(h('div', { class: 'comprobante' }, o.proof && String(o.proof).startsWith('data:image/') ? verComprobante(o) : null,
       h('div', null, h('div', null, 'El asistente leyó ', h('b', { class: 'num' }, pesos(o.proofMonto || 0))), h('span', { class: 'chip ' + (covers ? 'chip--ok' : 'chip--mal') }, covers ? 'Cubre el total' : 'No cubre el total'))));
     const yes = h('button', { class: 'btn btn--morado', type: 'button' }, 'Confirmar pago'), no = h('button', { class: 'btn btn--peligro', type: 'button' }, 'Rechazar');
     yes.onclick = () => act(o, { status: 'alistando' });
