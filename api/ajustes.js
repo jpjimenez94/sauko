@@ -3,6 +3,8 @@ import { cargarNegocio, negocioLimpio } from "../lib/comun.js";
 import { leerAjustes, guardarAjustes, leerBitacora, contarPromos, leerConsumo, marcarAsistenteCaido } from "../lib/store.js";
 import { hayWhatsApp } from "../lib/whatsapp.js";
 import { modeloEnUso } from "../lib/agente.js";
+import { telefonoDomiciliario } from "../lib/domiciliarios.js";
+import { turnoAbierto } from "../lib/store.js";
 
 /** Lo que el panel muestra del gasto en IA. El saldo es una estimación: lo que el administrador dijo que había menos lo gastado desde entonces. */
 function resumenDeIA(credito, consumo) {
@@ -30,6 +32,11 @@ function resumenDeIA(credito, consumo) {
 // (horario y valor del domicilio, cuenta para transferir, lista de prueba, pausa) y el gasto en IA.
 // Cualquier usuario del panel ve el interruptor y si el asistente está caído; solo un administrador
 // ve y cambia lo demás.
+/** Los domiciliarios con su turno. El teléfono solo lo ve el administrador. */
+async function domiciliariosPara(lista, admin) {
+  return Promise.all((Array.isArray(lista) ? lista : []).map(async (d) => ({ id: d.id, nombre: d.nombre, activo: d.activo, turno: d.activo ? await turnoAbierto(telefonoDomiciliario(d.telefono)) : false, ...(admin ? { telefono: d.telefono } : {}) })));
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   try {
@@ -37,7 +44,7 @@ export default async function handler(req, res) {
       const yo = await exigirSesion(req, res, req.query?.bitacora ? ["admin"] : undefined);
       if (!yo) return;
       const [ajustes, consumo] = await Promise.all([leerAjustes(), leerConsumo()]);
-      const base = { whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, apagadoSolo: Boolean(ajustes.apagadoSolo) };
+      const base = { whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, apagadoSolo: Boolean(ajustes.apagadoSolo), domiciliarios: await domiciliariosPara(ajustes.domiciliarios, yo.rol === "admin") };
       if (yo.rol !== "admin") return res.status(200).json(base);
       const negocio = await cargarNegocio(true);
       const ia = resumenDeIA(ajustes.credito, consumo);
@@ -66,8 +73,17 @@ export default async function handler(req, res) {
         if (!(saldo >= 0 && saldo <= 100000) || !(minimo >= 0 && minimo <= 100000)) return res.status(400).json({ error: "Escribe el saldo y el mínimo en dólares." });
         ajustes.credito = { saldo, minimo, marca: consumo.total, fecha: new Date().toISOString() };
       }
+      // Domiciliarios: la lista completa que manda el panel (nombre, WhatsApp y si está activo).
+      if (Array.isArray(req.body?.domiciliarios)) {
+        ajustes.domiciliarios = req.body.domiciliarios.slice(0, 20).map((d) => ({
+          id: String(d.id || Math.random().toString(36).slice(2, 10)).slice(0, 20),
+          nombre: String(d.nombre ?? "").replace(/\s+/g, " ").trim().slice(0, 40),
+          telefono: telefonoDomiciliario(d.telefono),
+          activo: d.activo !== false,
+        })).filter((d) => d.nombre && d.telefono.length >= 10);
+      }
       await guardarAjustes(ajustes);
-      return res.status(200).json({ whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, apagadoSolo: Boolean(ajustes.apagadoSolo), negocio: await cargarNegocio(true), ia: resumenDeIA(ajustes.credito, consumo) });
+      return res.status(200).json({ domiciliarios: await domiciliariosPara(ajustes.domiciliarios, true), whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, apagadoSolo: Boolean(ajustes.apagadoSolo), negocio: await cargarNegocio(true), ia: resumenDeIA(ajustes.credito, consumo) });
     }
     return res.status(405).json({ error: "Método no permitido" });
   } catch (error) {

@@ -4,6 +4,7 @@ import { listarPedidos, leerPedido, guardarPedido, borrarPedido, reponer } from 
 import { avisoDeTienda } from "../lib/conversacion.js";
 import { enviarTexto } from "../lib/whatsapp.js";
 import { avisarEntrega } from "../lib/opiniones.js";
+import { asignarYAvisar } from "../lib/domiciliarios.js";
 
 // Estados que puede poner la página del cliente y estados que solo mueve el panel.
 // "alistando" solo lo puede poner el cliente cuando paga contraentrega: no hay pago que confirmar.
@@ -88,12 +89,23 @@ export default async function handler(req, res) {
     if (req.method === "PATCH") {
       if (!(await exigirSesion(req, res))) return;
       const pedido = await leerPedido(texto(req.body?.id, 40));
+      if (pedido && req.body?.cambios?.efectivoEnCaja === true) {
+        Object.assign(pedido, { efectivoPorEntregar: 0, efectivoEnCajaEn: Date.now() });
+        await guardarPedido(pedido);
+        return res.status(200).json({ ok: true });
+      }
       const estado = req.body?.cambios?.status;
       if (!pedido || !DEL_PANEL.includes(estado)) return res.status(400).json({ error: "Cambio no válido" });
       // Cancelar solo aplica a pedidos que ya están en la tienda (alistando o en camino).
       if (estado === "cancelado" && !["alistando", "en_camino"].includes(pedido.status)) return res.status(400).json({ error: "Ese pedido no se puede cancelar desde aquí." });
       pedido.status = estado;
       if (estado === "esperando_pago") Object.assign(pedido, { rechazo: Date.now(), proof: "", proofMonto: 0 });
+      // Al despachar se asigna el domiciliario y le llega el pedido por WhatsApp.
+      if (estado === "en_camino") {
+        if (!pedido.codigo) pedido.codigo = String(1000 + Math.floor(Math.random() * 9000));
+        await asignarYAvisar(pedido, String(req.body?.cambios?.domiciliario ?? ""));
+      }
+      if (estado === "entregado") Object.assign(pedido, { entregadoEn: Date.now(), efectivoPorEntregar: pedido.pago === "Contraentrega" ? pedido.total : 0 });
       if (estado === "cancelado") {
         const motivo = MOTIVOS.includes(req.body?.cambios?.motivo) ? req.body.cambios.motivo : "Otro";
         // Las unidades vuelven una sola vez, y solo si salieron y la tienda no las marcó como perdidas.

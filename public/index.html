@@ -291,6 +291,13 @@ input { font: inherit; color: inherit; }
 .columna h2 span { background: var(--sol); border-radius: 999px; padding: 0 0.6rem; font-size: 0.95rem; }
 .tarjeta.tarjeta--toca { border-left-color: var(--mal); box-shadow: 0 0 0 3px var(--mal); }
 .tarjeta.tarjeta--espera { border-left-color: var(--lila); }
+.codigo-bolsa { display: flex; align-items: baseline; gap: 0.6rem; }
+.codigo-bolsa span { font-size: 0.8rem; opacity: 0.7; }
+.codigo-bolsa b { font-family: var(--display); font-size: 1.9rem; letter-spacing: 0.08em; color: var(--morado-oscuro); line-height: 1; }
+.domi-estado { font-size: 0.88rem; background: var(--lila-claro); border-radius: 10px; padding: 0.5rem 0.7rem; }
+.domi-estado--mal { background: var(--mal-bg); color: var(--mal); }
+.domi-fila { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px dashed #d6d0e2; }
+.domi-fila label { display: flex; gap: 0.3rem; align-items: center; font-size: 0.88rem; }
 .cancelar { display: grid; gap: 0.5rem; background: var(--mal-bg); border-radius: 12px; padding: 0.8rem; }
 .cancelar select { padding: 0.4rem; border-radius: 8px; border: 1px solid #cfc8de; font: inherit; background: #fff; }
 .cancelar label { display: flex; gap: 0.5rem; align-items: center; font-weight: 700; }
@@ -626,6 +633,7 @@ input { font: inherit; color: inherit; }
       </section>
       <div class="aviso-stock" id="aviso-ia" role="alert" hidden></div>
       <div class="aviso-stock" id="aviso-opiniones" role="alert" hidden></div>
+      <div class="aviso-stock" id="aviso-domis" role="status" hidden></div>
       <div class="aviso-stock" id="aviso-stock" role="status" hidden></div>
       <p class="intro">El asistente ya armó el pedido y leyó el comprobante. Aquí se confirma el pago, se alista y se despacha; cada toque le avisa al cliente por el chat.</p>
       <div class="tablero" id="tablero"></div>
@@ -733,6 +741,17 @@ input { font: inherit; color: inherit; }
             <label class="rotulo">Llave<input class="campo" id="aj-llave" type="text" maxlength="60"></label>
           </div>
           <p class="vacio" id="aj-vista-cuenta"></p>
+        </section>
+        <section class="caja">
+          <h2>Domiciliarios</h2>
+          <p class="vacio">Al despachar, al domiciliario le llega el pedido por WhatsApp con un código; al entregar responde con el código y una foto y el pedido queda entregado solo. Para poder escribirle, cada día debe mandar "inicio turno" al WhatsApp de Sauko. Mientras su número esté activo aquí, sus mensajes no los atiende el asistente de ventas.</p>
+          <div class="bitacora__lista" id="domis-lista"></div>
+          <div class="formulario">
+            <label class="rotulo">Nombre<input class="campo" id="domi-nombre" type="text" maxlength="40"></label>
+            <label class="rotulo">WhatsApp <small>celular de 10 dígitos</small><input class="campo" id="domi-telefono" type="tel" inputmode="numeric" maxlength="15"></label>
+            <button class="btn btn--morado" type="button" id="domi-agregar">Agregar domiciliario</button>
+          </div>
+          <p class="vacio" id="domis-estado" role="status"></p>
         </section>
         <section class="caja">
           <h2>Asistente de WhatsApp</h2>
@@ -1451,15 +1470,13 @@ function pintarWhatsApp(a) { const b = $('wa-interruptor'); b.hidden = false; b.
 $('wa-interruptor').onclick = () => { const encender = $('wa-interruptor').getAttribute('aria-pressed') !== 'true'; pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ whatsappActivo: encender }) }).then(pintarWhatsApp).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); };
 // Visor del comprobante: la miniatura de la tarjeta se abre a pantalla completa; tocar la imagen
 // alterna entre verla entera y a tamaño real para leer los números.
-function verComprobante(o) {
-  const mini = h('img', { src: o.proof, alt: 'Comprobante del pedido #' + o.no + ' (tocá para ampliar)', title: 'Ver el comprobante en grande' });
-  const abrir = h('button', { class: 'comprobante__ampliar', type: 'button', 'aria-label': 'Ver el comprobante del pedido #' + o.no + ' en grande' }, mini, h('span', null, 'Ver grande'));
-  abrir.onclick = () => {
-    $('visor-titulo').textContent = 'Comprobante del pedido #' + o.no + (o.proofMonto ? ' · el asistente leyó ' + pesos(o.proofMonto) : '');
-    $('visor-img').src = o.proof; $('visor-img').classList.remove('real'); $('visor').showModal();
-  };
+function verFoto(src, titulo) {
+  const mini = h('img', { src, alt: titulo + ' (tocá para ampliar)', title: 'Ver en grande' });
+  const abrir = h('button', { class: 'comprobante__ampliar', type: 'button', 'aria-label': titulo + ': ver en grande' }, mini, h('span', null, 'Ver grande'));
+  abrir.onclick = () => { $('visor-titulo').textContent = titulo; $('visor-img').src = src; $('visor-img').classList.remove('real'); $('visor').showModal(); };
   return abrir;
 }
+const verComprobante = o => verFoto(o.proof, 'Comprobante del pedido #' + o.no + (o.proofMonto ? ' · el asistente leyó ' + pesos(o.proofMonto) : ''));
 function act(o, patch) { store.patch(o.id, patch).then(() => store.inventario()).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); }
 // Pedidos programados: se ordenan por la hora en que hay que despacharlos (15 minutos antes de la
 // entrega) y resaltan cuando ya toca.
@@ -1478,6 +1495,16 @@ function tarjeta(o) {
   const el = h('article', { class: 'tarjeta' + (nueva ? ' tarjeta--nueva' : '') + (yaToca(o) ? ' tarjeta--toca' : pendiente ? ' tarjeta--espera' : '') }), items = Array.isArray(o.items) ? o.items : [];
   el.append(h('div', { class: 'tarjeta__cabeza' }, h('strong', { class: 'n num' }, '#' + o.no), h('small', { class: 'num' }, new Date(o.hora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) + ' · ' + String(o.canal || 'Web') + (o.cliente ? ' +' + String(o.cliente).replace(/^[+]/, '') : ''))));
   el.append(h('p', null, h('b', null, 'Entrega: '), String(o.direccion || '')));
+  // Código del pedido: se escribe en la bolsa al alistar y es el que manda el domiciliario al entregar.
+  if (o.codigo && ['alistando', 'en_camino'].includes(o.status)) el.append(h('p', { class: 'codigo-bolsa' }, h('span', null, o.status === 'alistando' ? 'Código para la bolsa' : 'Código'), h('b', { class: 'num' }, o.codigo)));
+  if (o.domiciliario && o.status === 'en_camino') el.append(h('p', { class: 'domi-estado' + (o.avisoDomiciliario === 'enviado' ? '' : ' domi-estado--mal') }, h('b', null, o.domiciliario.nombre + ': '),
+    o.avisoDomiciliario === 'enviado' ? 'le llegó el pedido por WhatsApp.' : o.avisoDomiciliario === 'sin turno' ? 'no se le pudo avisar porque no ha iniciado turno. Pedile que escriba "inicio turno" al WhatsApp de Sauko.' : 'no se le pudo avisar por WhatsApp. Avisale por teléfono.'));
+  if (o.status === 'entregado' && (o.entregadoPor || o.fotoEntrega)) el.append(h('div', { class: 'comprobante' }, o.fotoEntrega ? verFoto(o.fotoEntrega, 'Entrega del pedido #' + o.no + (o.entregadoPor ? ' · ' + o.entregadoPor : '')) : null,
+    h('div', null, 'Entregó ' + (o.entregadoPor || 'la tienda'), o.fotoPesada ? h('small', null, ' · la foto está en el WhatsApp') : null)));
+  if (o.status === 'entregado' && o.efectivoPorEntregar > 0) {
+    const caja = dosPasos(h('button', { class: 'mini', type: 'button' }, 'Recibido en caja'), '¿Llegaron ' + pesos(o.efectivoPorEntregar) + '?', () => act(o, { efectivoEnCaja: true }));
+    el.append(h('p', { class: 'domi-estado domi-estado--mal' }, h('b', null, 'Efectivo por llevar a caja: ' + pesos(o.efectivoPorEntregar) + ' '), caja));
+  }
   if (pendiente) {
     const cuando = String(o.programado.fijo || o.encargo || '').replace('Programado: ', '');
     const aviso = falta <= 0 ? 'La hora de entrega pasó hace ' + duracion(falta) : yaToca(o) ? 'Despachar ya: se entrega en ' + duracion(falta) : 'Faltan ' + duracion(falta);
@@ -1511,8 +1538,12 @@ function tarjeta(o) {
   } else if (picking) {
     const go = h('button', { class: 'btn btn--morado', type: 'button', disabled: set.size < items.length }, 'Despachar');
     // Programado y todavía no es hora: se puede despachar antes, pero pide confirmarlo con un segundo toque.
-    if (pendiente && !yaToca(o)) { go.textContent = 'Despachar antes de la hora'; go.classList.replace('btn--morado', 'btn--linea'); dosPasos(go, 'Faltan ' + duracion(falta) + ' · ¿Despachar ya?', () => act(o, { status: 'en_camino' })); }
-    else go.onclick = () => act(o, { status: 'en_camino' });
+    const activos = DOMIS.filter(d => d.activo), elegir = activos.length > 1 ? h('select', { 'aria-label': 'Domiciliario' }, ...activos.map(d => h('option', { value: d.id }, d.nombre + (d.turno ? '' : ' (sin turno)')))) : null;
+    const despachar = () => act(o, { status: 'en_camino', domiciliario: elegir ? elegir.value : (activos[0] || {}).id || '' });
+    if (pendiente && !yaToca(o)) { go.textContent = 'Despachar antes de la hora'; go.classList.replace('btn--morado', 'btn--linea'); dosPasos(go, 'Faltan ' + duracion(falta) + ' · ¿Despachar ya?', despachar); }
+    else go.onclick = despachar;
+    if (elegir) acts.append(elegir);
+    else if (activos.length === 1) acts.append(h('small', null, 'Sale con ' + activos[0].nombre));
     const completo = set.size >= items.length, todos = h('button', { class: 'btn btn--linea', type: 'button' }, completo ? 'Desmarcar todos' : 'Marcar todos');
     todos.onclick = () => { picked.set(o.id, completo ? new Set() : new Set(items.map(i => i.sku))); renderPanel(); };
     acts.append(todos, go, h('small', null, set.size + ' de ' + items.length + ' alistados'));
@@ -1673,6 +1704,38 @@ function vistaPreviaAjustes() {
   $('aj-vista-cuenta').textContent = partes.length ? 'Así se lo dice el asistente al cliente: ' + partes.join('. ') : 'Sin cuenta ni llave, el asistente no puede dar datos para transferir.';
 }
 function pintarAjustes(n) { for (const k of [...AJ_NUMEROS, ...AJ_TEXTOS]) $('aj-' + k).value = n[k]; vistaPreviaAjustes(); }
+/* Domiciliarios: lista en Ajustes, aviso de turno en Pedidos y selección al despachar */
+let DOMIS = [];
+function pintarDomiciliarios(a) {
+  if (!Array.isArray(a.domiciliarios)) return;
+  // Si cambió la lista, se redibuja el tablero para que "Despachar" ofrezca a quien corresponde.
+  const cambio = JSON.stringify(DOMIS) !== JSON.stringify(a.domiciliarios);
+  DOMIS = a.domiciliarios;
+  if (cambio && panelOrders.length) renderPanel();
+  const sinTurno = DOMIS.filter(d => d.activo && !d.turno);
+  $('aviso-domis').hidden = !sinTurno.length;
+  $('aviso-domis').replaceChildren(...sinTurno.map(d => h('p', null, h('b', null, d.nombre + ' no ha iniciado turno. '), 'Para que le lleguen los pedidos por WhatsApp, pedile que escriba "inicio turno" al WhatsApp de Sauko.')));
+  if (!YO || YO.rol !== 'admin') return;
+  $('domis-lista').replaceChildren(...(DOMIS.length ? DOMIS.map(d => {
+    const activo = h('input', { type: 'checkbox', checked: d.activo, 'aria-label': 'Activo' });
+    activo.onchange = () => guardarDomiciliarios(DOMIS.map(x => x.id === d.id ? { ...x, activo: activo.checked } : x));
+    const quitar = dosPasos(h('button', { class: 'mini mini--mal', type: 'button' }, 'Quitar'), '¿Quitar a ' + d.nombre + '?', () => guardarDomiciliarios(DOMIS.filter(x => x.id !== d.id)));
+    return h('div', { class: 'domi-fila' }, h('span', null, h('b', null, d.nombre), ' · ' + (d.telefono || ''), ' · ', d.activo ? (d.turno ? h('span', { class: 'chip chip--ok' }, 'En turno') : h('span', { class: 'chip chip--mal' }, 'Sin turno hoy')) : h('span', { class: 'chip' }, 'Inactivo')),
+      h('label', null, activo, ' Activo'), quitar);
+  }) : [h('p', { class: 'vacio' }, 'Todavía no hay domiciliarios.')]));
+}
+function guardarDomiciliarios(lista) {
+  return pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ domiciliarios: lista }) })
+    .then(a => { pintarDomiciliarios(a); $('domis-estado').textContent = 'Guardado.'; }).catch(err => { $('domis-estado').textContent = err.message; });
+}
+// Enter en estos campos agrega al domiciliario (y no envía el formulario de ajustes).
+for (const id of ['domi-nombre', 'domi-telefono']) $(id).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('domi-agregar').click(); } });
+$('domi-agregar').onclick = () => {
+  const nombre = $('domi-nombre').value.trim(), telefono = $('domi-telefono').value.replace(/\D/g, '');
+  if (!nombre || telefono.length < 10) { $('domis-estado').textContent = 'Escribí el nombre y un WhatsApp de 10 dígitos.'; return; }
+  guardarDomiciliarios([...DOMIS, { nombre, telefono, activo: true }]).then(() => { $('domi-nombre').value = ''; $('domi-telefono').value = ''; });
+};
+
 /* Gasto del asistente y avisos: saldo bajo (solo administrador) y asistente caído (todos) */
 const usd = n => 'US$' + Number(n || 0).toFixed(n >= 10 ? 1 : 2);
 function pintarIA(a) {
@@ -1691,8 +1754,8 @@ $('ia-form').onsubmit = e => { e.preventDefault();
   pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ credito: { saldo: Number($('ia-saldo-real').value), minimo: Number($('ia-minimo').value) } }) })
     .then(a => { pintarIA(a); $('ia-saldo-real').value = ''; $('ia-estado').textContent = 'Saldo cuadrado. Desde ahora se descuenta lo que gaste el asistente.'; }).catch(err => { $('ia-estado').textContent = err.message; }); };
 // Cada minuto, sin tocar el formulario de ajustes que alguien pueda estar llenando.
-setInterval(() => { if (vistaActual === 'panel' && panelAbierto) { pedir('/api/ajustes').then(a => { pintarWhatsApp(a); pintarIA(a); }).catch(() => {}); cargarOpiniones(); } }, 60000);
-function cargarAjustes() { return pedir('/api/ajustes').then(a => { pintarWhatsApp(a); pintarIA(a); if (a.negocio) pintarAjustes(a.negocio); if (a.promos != null) $('aj-promos').textContent = 'Clientes que autorizaron promociones respondiendo SI PROMOS: ' + a.promos + '.'; }).catch(() => {}); }
+setInterval(() => { if (vistaActual === 'panel' && panelAbierto) { pedir('/api/ajustes').then(a => { pintarWhatsApp(a); pintarIA(a); pintarDomiciliarios(a); }).catch(() => {}); cargarOpiniones(); } }, 60000);
+function cargarAjustes() { return pedir('/api/ajustes').then(a => { pintarWhatsApp(a); pintarIA(a); pintarDomiciliarios(a); if (a.negocio) pintarAjustes(a.negocio); if (a.promos != null) $('aj-promos').textContent = 'Clientes que autorizaron promociones respondiendo SI PROMOS: ' + a.promos + '.'; }).catch(() => {}); }
 $('aj-form').addEventListener('input', () => { $('aj-estado').textContent = ''; vistaPreviaAjustes(); });
 $('aj-form').onsubmit = e => { e.preventDefault();
   const n = leerAjustesDelFormulario();
@@ -1843,7 +1906,7 @@ fetch('catalog.json').then(r => r.json()).then(d => {
   const vista = location.hash.slice(1); if (vista === 'panel' || vista === 'carta') verVista(vista);
 }).catch(() => { $('cat-accesos').replaceChildren(h('p', null, 'No se pudo cargar el catálogo. Recarga la página.')); });
 storeReady.then(s => { store = s; s.all(list => {
-    const firma = JSON.stringify(list.map(o => [o.id, o.status, o.total, o.proofMonto, o.rechazo, o.encargo, (o.items || []).length])) + (list.some(o => o.programado) ? Math.floor(Date.now() / 60000) : '');
+    const firma = JSON.stringify(list.map(o => [o.id, o.status, o.total, o.proofMonto, o.rechazo, o.encargo, (o.items || []).length, o.codigo, o.avisoDomiciliario, o.efectivoPorEntregar, !!o.fotoEntrega])) + (list.some(o => o.programado) ? Math.floor(Date.now() / 60000) : '');
     panelOrders = list; avisarNuevos(list);
     if (firma !== firmaTablero) { firmaTablero = firma; renderPanel(); }
   });
