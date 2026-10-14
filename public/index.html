@@ -465,7 +465,7 @@ input { font: inherit; color: inherit; }
         <h2 class="titulo"><span class="revela">Pasá por el local</span> <span class="revela">o te lo subimos.</span></h2>
       </div>
       <div class="local__lista">
-        <article class="fila"><div><h3>Local 23</h3><small>Hacienda Kachipay</small></div><p>Cl 60A #119C-84, Villa Fátima, Cali</p><p>Domicilios de 9 a.m. a 10 p.m.</p><button class="btn btn--dark" type="button" data-abrir-chat>Pedir aquí</button></article>
+        <article class="fila"><div><h3>Local 23</h3><small>Hacienda Kachipay</small></div><p>Cl 60A #119C-84, Villa Fátima, Cali</p><p id="local-horario">Domicilios de 9 a.m. a 10 p.m.</p><button class="btn btn--dark" type="button" data-abrir-chat>Pedir aquí</button></article>
         <article class="fila"><div><h3>WhatsApp</h3><small>Pedidos y domicilios</small></div><p>312 452 9879</p><p>Contraentrega o transferencia</p><a class="btn btn--dark" href="https://wa.me/573124529879">Escribir</a></article>
         <article class="fila"><div><h3>Instagram</h3><small>Novedades y antojos</small></div><p>@sauko.store</p><p>Productos de temporada</p><a class="btn btn--dark" href="https://www.instagram.com/sauko.store/">Ver perfil</a></article>
       </div>
@@ -912,6 +912,8 @@ let NEGOCIO = { costoDomicilio: 2000, datosTransferencia: '', notaHorario: '', e
 async function cargarNegocio() {
   try {
     const c = await fetch('/api/config').then(r => r.json());
+    const h12 = n => (n % 12 || 12) + (n % 24 < 12 ? ' a.m.' : ' p.m.');
+    if (c && c.domicilios && $('local-horario')) $('local-horario').textContent = 'Domicilios de ' + h12(c.domicilios.desde) + ' a ' + h12(c.domicilios.hasta);
     if (c && Number(c.costoDomicilio) >= 0) NEGOCIO = { costoDomicilio: Number(c.costoDomicilio), datosTransferencia: String(c.datosTransferencia || ''), notaHorario: String(c.notaHorario || ''), encargo: String(c.encargo || '') };
   } catch (e) {}
 }

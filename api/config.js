@@ -1,4 +1,4 @@
-import { METODOS_PAGO, datosTransferencia, horario, cargarNegocio } from "../lib/comun.js";
+import { METODOS_PAGO, datosTransferencia, horario, cargarNegocio, negocioActual } from "../lib/comun.js";
 
 // Lo que la página necesita saber del negocio en este momento. Es público: son los datos que se
 // le dan a cualquier cliente. El costo del domicilio y la nota de horario cambian con la hora.
@@ -15,6 +15,7 @@ export default async function handler(req, res) {
     franja: ahora.franja,
     notaHorario: ahora.nota,
     encargo: ahora.encargo,
+    domicilios: { desde: negocioActual().domiDesde, hasta: negocioActual().domiPrimeHasta },
     metodosPago: METODOS_PAGO,
     datosTransferencia: datosTransferencia(),
   });
