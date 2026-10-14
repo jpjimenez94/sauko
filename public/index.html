@@ -278,6 +278,11 @@ input { font: inherit; color: inherit; }
 .columna { display: grid; gap: 0.8rem; min-width: 0; }
 .columna h2 { font-family: var(--display); font-weight: 800; color: var(--morado-oscuro); font-size: 1.3rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--morado-oscuro); padding-bottom: 0.3rem; line-height: 1.1; }
 .columna h2 span { background: var(--sol); border-radius: 999px; padding: 0 0.6rem; font-size: 0.95rem; }
+.tarjeta.tarjeta--toca { border-left-color: var(--mal); box-shadow: 0 0 0 3px var(--mal); }
+.tarjeta.tarjeta--espera { border-left-color: var(--lila); }
+.programado { display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; align-items: center; font-size: 0.9rem; }
+.tarjeta--toca .programado b { color: var(--mal); }
+.chip--espera { background: var(--lila-claro); color: var(--morado-oscuro); }
 .tarjeta { background: #fff; border-radius: 18px; padding: 1rem; border-left: 8px solid var(--sol); display: grid; gap: 0.6rem; animation: entra 0.5s ease; }
 @keyframes entra { from { transform: translateY(16px); opacity: 0; } }
 .tarjeta__cabeza { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
@@ -1346,11 +1351,23 @@ $('salir').onclick = () => pedir('/api/sesion', { method: 'DELETE' }).catch(() =
 function pintarWhatsApp(a) { const b = $('wa-interruptor'); b.hidden = false; b.setAttribute('aria-pressed', String(!!a.whatsappActivo)); b.textContent = !a.whatsappConectado ? 'WhatsApp: sin conectar' : a.whatsappActivo ? 'WhatsApp: encendido' : 'WhatsApp: apagado'; b.disabled = !a.whatsappConectado || !YO || YO.rol !== 'admin'; }
 $('wa-interruptor').onclick = () => { const encender = $('wa-interruptor').getAttribute('aria-pressed') !== 'true'; pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ whatsappActivo: encender }) }).then(pintarWhatsApp).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); };
 function act(o, patch) { store.patch(o.id, patch).then(() => store.inventario()).catch(() => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; }); }
+// Pedidos programados: se ordenan por la hora en que hay que despacharlos (15 minutos antes de la
+// entrega) y resaltan cuando ya toca.
+const ANTES_DE_ENTREGAR = 15 * 60000;
+const horaProgramada = o => (o.programado && Number(o.programado.ts)) || 0;
+const turnoDe = o => horaProgramada(o) ? horaProgramada(o) - ANTES_DE_ENTREGAR : o.hora;
+const yaToca = o => !!horaProgramada(o) && o.status === 'alistando' && Date.now() >= horaProgramada(o) - ANTES_DE_ENTREGAR;
+const duracion = ms => { const min = Math.max(1, Math.round(Math.abs(ms) / 60000)); return min < 60 ? min + ' min' : Math.floor(min / 60) + ' h' + (min % 60 ? ' ' + (min % 60) + ' min' : ''); };
 function tarjeta(o) {
-  const el = h('article', { class: 'tarjeta' }), items = Array.isArray(o.items) ? o.items : [];
+  const pendiente = !!horaProgramada(o) && ['esperando_pago', 'por_confirmar', 'alistando'].includes(o.status), falta = horaProgramada(o) - Date.now();
+  const el = h('article', { class: 'tarjeta' + (yaToca(o) ? ' tarjeta--toca' : pendiente ? ' tarjeta--espera' : '') }), items = Array.isArray(o.items) ? o.items : [];
   el.append(h('div', { class: 'tarjeta__cabeza' }, h('strong', { class: 'n num' }, '#' + o.no), h('small', { class: 'num' }, new Date(o.hora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) + ' · ' + String(o.canal || 'Web') + (o.cliente ? ' +' + String(o.cliente).replace(/^[+]/, '') : ''))));
   el.append(h('p', null, h('b', null, 'Entrega: '), String(o.direccion || '')));
-  if (o.encargo) el.append(h('p', null, h('span', { class: 'chip chip--mal' }, String(o.encargo))));
+  if (pendiente) {
+    const cuando = String(o.programado.fijo || o.encargo || '').replace('Programado: ', '');
+    const aviso = falta <= 0 ? 'La hora de entrega pasó hace ' + duracion(falta) : yaToca(o) ? 'Despachar ya: se entrega en ' + duracion(falta) : 'Faltan ' + duracion(falta);
+    el.append(h('p', { class: 'programado' }, h('span', { class: 'chip ' + (yaToca(o) ? 'chip--mal' : 'chip--espera') }, 'Programado: ' + cuando), h('b', null, aviso)));
+  } else if (o.encargo) el.append(h('p', null, h('span', { class: 'chip chip--mal' }, String(o.encargo))));
   const picking = o.status === 'alistando', set = picked.get(o.id) || new Set();
   el.append(h('ul', null, ...items.map((i, k) => { const p = BY_SKU.get(i.sku);
     const txt = h('span', null, i.qty + ' × ' + i.name, h('small', null, (p ? p.type + ' · ' : '') + i.sku));
@@ -1407,6 +1424,8 @@ function sonar() {
 }
 function avisarNuevos(lista) {
   const llaves = lista.filter(o => POR_ATENDER.includes(o.status)).map(o => o.id + ':' + o.status);
+  // También suena cuando a un pedido programado le llega la hora de despacharse.
+  for (const o of lista) if (yaToca(o)) llaves.push(o.id + ':toca');
   // La primera carga no suena: son pedidos que ya estaban.
   if (yaAvisados && llaves.some(k => !yaAvisados.has(k))) sonar();
   yaAvisados = new Set(llaves);
@@ -1414,7 +1433,7 @@ function avisarNuevos(lista) {
   document.title = (pendientes ? '(' + pendientes + ') ' : '') + 'Sauko Store · ' + (vistaActual === 'panel' ? 'Panel' : 'Minimarket a domicilio');
 }
 function renderPanel() {
-  const de = st => panelOrders.filter(o => o.status === st).sort((a, b) => a.hora - b.hora);
+  const de = st => panelOrders.filter(o => o.status === st).sort((a, b) => turnoDe(a) - turnoDe(b));
   $('tablero').replaceChildren(...COLS.map(([st, title, empty]) => { const list = de(st);
     return h('div', { class: 'columna' }, h('h2', null, title, h('span', { class: 'num' }, String(list.length))), ...(list.length ? list.map(tarjeta) : [h('p', { class: 'vacio' }, empty)])); }));
   const entregados = de('entregado');
