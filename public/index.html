@@ -598,6 +598,7 @@ input { font: inherit; color: inherit; }
         <div class="kpi"><strong id="k-camino">0</strong><span>En camino</span></div>
         <div class="kpi kpi--ventas"><strong id="k-ventas">$0</strong><span>Vendido en pedidos</span></div>
       </section>
+      <div class="aviso-stock" id="aviso-ia" role="alert" hidden></div>
       <div class="aviso-stock" id="aviso-stock" role="status" hidden></div>
       <p class="intro">El asistente ya armó el pedido y leyó el comprobante. Aquí se confirma el pago, se alista y se despacha; cada toque le avisa al cliente por el chat.</p>
       <div class="tablero" id="tablero"></div>
@@ -706,6 +707,23 @@ input { font: inherit; color: inherit; }
         </section>
         <div class="acciones"><button class="btn btn--morado" type="submit">Guardar ajustes</button><p class="vacio" id="aj-estado" role="status"></p></div>
       </form>
+      <section class="caja">
+        <h2>Gasto del asistente (IA)</h2>
+        <div class="kpis">
+          <div class="kpi kpi--ventas"><strong id="ia-saldo">—</strong><span>Saldo estimado</span></div>
+          <div class="kpi"><strong id="ia-hoy">$0</strong><span>Gastado hoy</span></div>
+          <div class="kpi"><strong id="ia-mes">$0</strong><span>Gastado este mes</span></div>
+          <div class="kpi"><strong id="ia-alcanza">—</strong><span>Mensajes que alcanza a atender</span></div>
+        </div>
+        <p class="vacio" id="ia-detalle"></p>
+        <form class="formulario" id="ia-form">
+          <label class="rotulo">Saldo que muestra la consola de Anthropic (USD) <small>escríbelo cada vez que recargues</small><input class="campo" id="ia-saldo-real" type="number" min="0" max="100000" step="0.01" inputmode="decimal" required></label>
+          <label class="rotulo">Avisarme cuando baje de (USD)<input class="campo" id="ia-minimo" type="number" min="0" max="100000" step="0.5" inputmode="decimal" value="3" required></label>
+          <button class="btn btn--morado" type="submit">Cuadrar saldo</button>
+        </form>
+        <p class="vacio" id="ia-estado" role="status"></p>
+        <p class="vacio">Es una estimación hecha con lo que informa cada respuesta del asistente. El dato oficial y la recarga automática están en console.anthropic.com, en Plans &amp; Billing.</p>
+      </section>
       <section class="bitacora">
         <h2>Diagnóstico de WhatsApp</h2>
         <div class="acciones"><button class="btn btn--linea" id="aj-ver-bitacora" type="button">Ver los últimos pasos</button></div>
@@ -1451,7 +1469,26 @@ function vistaPreviaAjustes() {
   $('aj-vista-cuenta').textContent = partes.length ? 'Así se lo dice el asistente al cliente: ' + partes.join('. ') : 'Sin cuenta ni llave, el asistente no puede dar datos para transferir.';
 }
 function pintarAjustes(n) { for (const k of [...AJ_NUMEROS, ...AJ_TEXTOS]) $('aj-' + k).value = n[k]; vistaPreviaAjustes(); }
-function cargarAjustes() { return pedir('/api/ajustes').then(a => { pintarWhatsApp(a); if (a.negocio) pintarAjustes(a.negocio); if (a.promos != null) $('aj-promos').textContent = 'Clientes que autorizaron promociones respondiendo SI PROMOS: ' + a.promos + '.'; }).catch(() => {}); }
+/* Gasto del asistente y avisos: saldo bajo (solo administrador) y asistente caído (todos) */
+const usd = n => 'US$' + Number(n || 0).toFixed(n >= 10 ? 1 : 2);
+function pintarIA(a) {
+  const ia = a.ia, caido = a.asistenteCaido, lineas = [];
+  if (caido) lineas.push(h('p', null, h('b', null, 'El asistente no está respondiendo. '), caido.motivo + ' Mientras tanto la tienda debe atender los chats a mano.'));
+  if (ia && ia.saldoBajo && !caido) lineas.push(h('p', null, h('b', null, 'Queda poco saldo para el asistente: '), usd(ia.saldo) + ' estimados. Recarga en console.anthropic.com para que no deje de responder.'));
+  $('aviso-ia').hidden = !lineas.length; $('aviso-ia').replaceChildren(...lineas);
+  if (!ia) return;
+  $('ia-saldo').textContent = ia.saldo == null ? 'Sin cuadrar' : usd(ia.saldo);
+  $('ia-hoy').textContent = usd(ia.hoy); $('ia-mes').textContent = usd(ia.mes);
+  $('ia-alcanza').textContent = ia.alcanzaPara == null ? '—' : ia.alcanzaPara.toLocaleString('es-CO');
+  $('ia-detalle').textContent = 'Modelo: ' + ia.modelo + ' · Mensajes atendidos hoy: ' + ia.mensajesHoy + ', este mes: ' + ia.mensajesMes + (ia.porMensaje ? ' · Costo promedio por mensaje: US$' + ia.porMensaje.toFixed(4) : '') + (ia.cuadradoEl ? ' · Saldo cuadrado el ' + new Date(ia.cuadradoEl).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+  if (document.activeElement !== $('ia-minimo') && ia.saldo != null) $('ia-minimo').value = ia.minimo;
+}
+$('ia-form').onsubmit = e => { e.preventDefault();
+  pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ credito: { saldo: Number($('ia-saldo-real').value), minimo: Number($('ia-minimo').value) } }) })
+    .then(a => { pintarIA(a); $('ia-saldo-real').value = ''; $('ia-estado').textContent = 'Saldo cuadrado. Desde ahora se descuenta lo que gaste el asistente.'; }).catch(err => { $('ia-estado').textContent = err.message; }); };
+// Cada minuto, sin tocar el formulario de ajustes que alguien pueda estar llenando.
+setInterval(() => { if (vistaActual === 'panel' && panelAbierto) pedir('/api/ajustes').then(a => { pintarWhatsApp(a); pintarIA(a); }).catch(() => {}); }, 60000);
+function cargarAjustes() { return pedir('/api/ajustes').then(a => { pintarWhatsApp(a); pintarIA(a); if (a.negocio) pintarAjustes(a.negocio); if (a.promos != null) $('aj-promos').textContent = 'Clientes que autorizaron promociones respondiendo SI PROMOS: ' + a.promos + '.'; }).catch(() => {}); }
 $('aj-form').addEventListener('input', () => { $('aj-estado').textContent = ''; vistaPreviaAjustes(); });
 $('aj-form').onsubmit = e => { e.preventDefault();
   const n = leerAjustesDelFormulario();
