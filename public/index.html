@@ -1473,7 +1473,7 @@ function pintarAjustes(n) { for (const k of [...AJ_NUMEROS, ...AJ_TEXTOS]) $('aj
 const usd = n => 'US$' + Number(n || 0).toFixed(n >= 10 ? 1 : 2);
 function pintarIA(a) {
   const ia = a.ia, caido = a.asistenteCaido, lineas = [];
-  if (caido) lineas.push(h('p', null, h('b', null, 'El asistente no está respondiendo. '), caido.motivo + ' Mientras tanto la tienda debe atender los chats a mano.'));
+  if (caido) lineas.push(h('p', null, h('b', null, 'El asistente no está respondiendo. '), caido.motivo + (a.apagadoSolo ? ' El asistente de WhatsApp se apagó solo para no dejar clientes esperando: la tienda atiende los chats a mano. Cuando esté resuelto, un administrador lo enciende con el botón WhatsApp.' : ' Mientras tanto la tienda debe atender los chats a mano.')));
   if (ia && ia.saldoBajo && !caido) lineas.push(h('p', null, h('b', null, 'Queda poco saldo para el asistente: '), usd(ia.saldo) + ' estimados. Recarga en console.anthropic.com para que no deje de responder.'));
   $('aviso-ia').hidden = !lineas.length; $('aviso-ia').replaceChildren(...lineas);
   if (!ia) return;

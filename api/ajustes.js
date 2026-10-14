@@ -1,6 +1,6 @@
 import { exigirSesion } from "../lib/usuarios.js";
 import { cargarNegocio, negocioLimpio } from "../lib/comun.js";
-import { leerAjustes, guardarAjustes, leerBitacora, contarPromos, leerConsumo } from "../lib/store.js";
+import { leerAjustes, guardarAjustes, leerBitacora, contarPromos, leerConsumo, marcarAsistenteCaido } from "../lib/store.js";
 import { hayWhatsApp } from "../lib/whatsapp.js";
 import { modeloEnUso } from "../lib/agente.js";
 
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
       const yo = await exigirSesion(req, res, req.query?.bitacora ? ["admin"] : undefined);
       if (!yo) return;
       const [ajustes, consumo] = await Promise.all([leerAjustes(), leerConsumo()]);
-      const base = { whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido };
+      const base = { whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, apagadoSolo: Boolean(ajustes.apagadoSolo) };
       if (yo.rol !== "admin") return res.status(200).json(base);
       const negocio = await cargarNegocio(true);
       const ia = resumenDeIA(ajustes.credito, consumo);
@@ -45,7 +45,15 @@ export default async function handler(req, res) {
     if (req.method === "POST") {
       if (!(await exigirSesion(req, res, ["admin"]))) return;
       const [ajustes, consumo] = await Promise.all([leerAjustes(), leerConsumo()]);
-      if (typeof req.body?.whatsappActivo === "boolean") ajustes.whatsappActivo = req.body.whatsappActivo;
+      if (typeof req.body?.whatsappActivo === "boolean") {
+        ajustes.whatsappActivo = req.body.whatsappActivo;
+        delete ajustes.apagadoSolo;
+        // Al encenderlo a mano se da por resuelta la caída; si sigue sin saldo, se apagará de nuevo con el primer mensaje.
+        if (ajustes.whatsappActivo && consumo.caido) {
+          await marcarAsistenteCaido(null);
+          consumo.caido = null;
+        }
+      }
       // Lo que no venga en el formulario conserva el valor vigente.
       if (req.body?.negocio && typeof req.body.negocio === "object") ajustes.negocio = negocioLimpio(req.body.negocio, await cargarNegocio(true));
       // El administrador cuadra el saldo con el que ve en la consola de Anthropic; desde ahí se descuenta lo gastado.
@@ -56,7 +64,7 @@ export default async function handler(req, res) {
         ajustes.credito = { saldo, minimo, marca: consumo.total, fecha: new Date().toISOString() };
       }
       await guardarAjustes(ajustes);
-      return res.status(200).json({ whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, negocio: await cargarNegocio(true), ia: resumenDeIA(ajustes.credito, consumo) });
+      return res.status(200).json({ whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, apagadoSolo: Boolean(ajustes.apagadoSolo), negocio: await cargarNegocio(true), ia: resumenDeIA(ajustes.credito, consumo) });
     }
     return res.status(405).json({ error: "Método no permitido" });
   } catch (error) {
