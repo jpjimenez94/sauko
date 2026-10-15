@@ -897,7 +897,7 @@ const MAX_POR_PRODUCTO = 99;
 let CAT = [], TYPES = [], BY_SKU = new Map();
 function loadCatalog(data) {
   TYPES = data.types;
-  const todos = data.rows.map(([sku, name, price, t, foto]) => ({ sku, name, price, type: TYPES[t], ti: t, foto: !!foto, n: norm(name), tok: norm(name).split(' ') }));
+  const todos = data.rows.map(([sku, name, price, t, foto, unidad]) => ({ sku, name, price, type: TYPES[t], ti: t, foto: !!foto, porLibra: unidad === 'lb', n: norm(name), tok: norm(name).split(' ') }));
   for (const p of todos) if (!BY_SKU.has(p.sku)) BY_SKU.set(p.sku, p);
   CAT = [...BY_SKU.values()]; CAT = [...CAT.filter(p => p.type !== 'Otros'), ...CAT.filter(p => p.type === 'Otros')];
 }
@@ -931,7 +931,7 @@ function pedidoGenerico(consulta) {
 // coincida con algo del pedido y cuyo acompañante no esté ya en él.
 const ACOMPANAR = [
   [/ (cerveza|aguardiente|ron|whisky|vodka|tequila|vino|refajo) /, ['papa', 'mani'], 'algo de picar para acompañar'],
-  [/ (papa|papas|doritos|detodito|cheetos|mani|manimoto|chocolatina|galleta|galletas|goma|gomas|natuchips|choclitos|tostacos|margarita|rizadas|patacon|golpe|popetas) /, ['gaseosa', 'jugo'], 'algo de tomar para acompañar'],
+  [/ (papa|papas|doritos|detodito|cheetos|mani|manimoto|chocolatina|galleta|galletas|goma|gomas|natuchips|choclitos|tostacos|margarita|rizadas|patacon|golpe|popetas) /, ['gaseosa', 'jugo'], 'algo de tomar para acompañar', true],
   [/ (pollo|carne|cerdo|costilla|pechuga|chorizo|tocineta) /, ['arroz', 'aceite'], 'algo para la preparación'],
   [/ (arroz|frijol|frijoles|lenteja|lentejas|pasta|spaguetti|spaghetti) /, ['aceite', 'atun'], 'algo para completar la comida'],
   [/ (pan|arepa|arepas|tostada|tostadas) /, ['queso', 'mantequilla'], 'algo para acompañar el pan o la arepa'],
@@ -945,8 +945,8 @@ const ACOMPANAR = [
 ];
 function paraAcompanar(items) {
   const nombres = items.map(i => ' ' + norm(BY_SKU.get(i.sku).name) + ' '), enPedido = new Set(items.map(i => i.sku));
-  for (const [dispara, ofrecer, frase] of ACOMPANAR) {
-    if (!nombres.some(n => dispara.test(n))) continue;
+  for (const [dispara, ofrecer, frase, sinFrescos] of ACOMPANAR) {
+    if (!nombres.filter(n => !sinFrescos || !n.includes(' libra ')).some(n => dispara.test(n))) continue;
     if (ofrecer.some(q => nombres.some(n => n.includes(' ' + q)))) return null;
     const productos = ofrecer.map(q => search(q).find(p => avail(p) > 0 && !enPedido.has(p.sku))).filter(Boolean).slice(0, 2);
     if (productos.length) return { ofrecer: frase, productos: productos.map(p => ({ sku: p.sku, nombre: p.name, precio: p.price })),
@@ -1066,6 +1066,12 @@ async function sync() {
       bubble('tienda', text); turns.push({ role: 'assistant', content: text }); if (o === order) renderOrder();
     });
   } catch (e) { bubble('error', 'El pedido no se pudo enviar al panel de la tienda. Revisa tu sesión y recarga.'); }
+}
+// Por unidad, enteros; por libra, de media en media libra (igual que el servidor en lib/comun.js).
+function cantidadValida(p, valor) {
+  const n = Number(valor);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return p && p.porLibra ? Math.min(20, Math.max(0.5, Math.round(n * 2) / 2)) : Math.min(99, Math.floor(n));
 }
 function setQty(sku, qty) {
   if (CLOSED.includes(order.status)) newOrder();
@@ -1222,14 +1228,14 @@ const TOOLS = [
   { name: 'guardar_pedido',
     description: 'Reemplaza el pedido completo del cliente con la lista de items dada (estado absoluto, no incremental) y opcionalmente guarda dirección y método de pago. Devuelve el pedido con subtotal, domicilio, total y problemas de existencias.',
     inputSchema: { type: 'object', properties: {
-      items: { type: 'array', items: { type: 'object', properties: { sku: { type: 'string' }, cantidad: { type: 'integer' } }, required: ['sku', 'cantidad'] } },
+      items: { type: 'array', items: { type: 'object', properties: { sku: { type: 'string' }, cantidad: { type: 'number', description: 'Unidades. En los productos por libra son libras y se permite media libra: 0.5, 1.5' } }, required: ['sku', 'cantidad'] } },
       direccion: { type: 'string', description: 'Conjunto o unidad, torre y apartamento o casa' }, metodo_pago: { type: 'string', enum: ['Transferencia', 'Contraentrega'] },
       entrega_dia: { type: 'string', enum: ['hoy', 'mañana'], description: 'Solo si el cliente pidió una hora de entrega: el día' }, entrega_hora: { type: 'string', description: 'Solo si el cliente pidió una hora de entrega: en 24 horas, por ejemplo "21:30". Con "ya" se quita la hora y vuelve a entrega inmediata.' } }, required: ['items'] },
     execute(input) {
       if (CLOSED.includes(order.status)) newOrder();
       const problemas = [], items = [];
       for (const it of Array.isArray(input.items) ? input.items : []) {
-        const p = BY_SKU.get(String(it.sku)); let qty = Math.floor(Number(it.cantidad));
+        const p = BY_SKU.get(String(it.sku)); let qty = cantidadValida(p, it.cantidad);
         if (!p) { problemas.push('SKU ' + it.sku + ' no existe; búscalo de nuevo'); continue; }
         if (!(qty > 0)) continue;
         if (avail(p) === 0) { problemas.push(p.name + ': agotado'); continue; }

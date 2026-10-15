@@ -1,4 +1,4 @@
-import { CATALOGO, METODOS_PAGO, totales, horario, cargarNegocio, revisarProgramado, momentoDe } from "../lib/comun.js";
+import { CATALOGO, METODOS_PAGO, totales, horario, cargarNegocio, revisarProgramado, momentoDe, cantidadValida } from "../lib/comun.js";
 import { exigirSesion } from "../lib/usuarios.js";
 import { listarPedidos, leerPedido, guardarPedido, borrarPedido, reponer } from "../lib/store.js";
 import { avisoDeTienda } from "../lib/conversacion.js";
@@ -22,8 +22,8 @@ function pedidoLimpio(entrada, anterior) {
   const items = [];
   for (const it of Array.isArray(entrada.items) ? entrada.items.slice(0, 80) : []) {
     const producto = CATALOGO.get(String(it.sku));
-    const qty = Math.floor(Number(it.qty));
-    if (!producto || !(qty >= 1 && qty <= 99)) return null;
+    const qty = cantidadValida(producto, it.qty);
+    if (!producto || !qty) return null;
     items.push({ sku: String(it.sku), name: producto.nombre, price: producto.precio, qty });
   }
   if (!items.length && entrada.status !== "armando") return null;
