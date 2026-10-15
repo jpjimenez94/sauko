@@ -5,7 +5,7 @@ import { newDb } from "pg-mem";
 
 process.env.DATABASE_URL = "postgres://prueba@localhost/prueba";
 globalThis.__saukoPgModulo = newDb().adapters.createPg();
-const { guardarPedido, leerPedido, listarPedidos, borrarPedido, hayPostgres } = await import("../lib/store.js");
+const { guardarPedido, leerPedido, listarPedidos, borrarPedido, hayPostgres, reiniciarDatos } = await import("../lib/store.js");
 
 assert.equal(hayPostgres, true);
 const pedido = { id: "pprueba0001", no: 1234, canal: "WhatsApp", cliente: "+573001112233", status: "armando", total: 10200, hora: Date.now(), direccion: "Torre 1", pago: "Contraentrega", pagaCon: 20000, items: [{ sku: "1", name: "Coca Cola 1.5", price: 8200, qty: 1 }] };
@@ -29,5 +29,12 @@ assert.equal(await leerPedido("noexiste"), null);
 assert.equal(await leerPedido(pedido.id, true), null, "un pedido archivado no se retoma");
 await guardarPedido({ ...pedido, status: "alistando" });
 assert.equal((await listarPedidos()).filter((p) => p.id === pedido.id).length, 1, "si el cliente lo vuelve a guardar, reaparece en el panel");
+
+// Dejar en cero antes de abrir al público: salen del panel pero quedan en el historial.
+await guardarPedido({ ...pedido, id: "pprueba0003", no: 1236, hora: Date.now() });
+assert.ok((await listarPedidos()).length >= 1);
+await reiniciarDatos({ pedidos: true });
+assert.equal((await listarPedidos()).length, 0, "en cero, el panel queda vacío");
+assert.equal((await leerPedido("pprueba0003")).id, "pprueba0003", "pero el pedido queda en el historial");
 
 console.log("Pedidos en Postgres: todo bien.");

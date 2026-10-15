@@ -1,6 +1,6 @@
 import { exigirSesion } from "../lib/usuarios.js";
 import { cargarNegocio, negocioLimpio } from "../lib/comun.js";
-import { leerAjustes, guardarAjustes, leerBitacora, contarPromos, leerConsumo, marcarAsistenteCaido } from "../lib/store.js";
+import { leerAjustes, guardarAjustes, leerBitacora, contarPromos, leerConsumo, marcarAsistenteCaido, reiniciarDatos, anotar } from "../lib/store.js";
 import { hayWhatsApp } from "../lib/whatsapp.js";
 import { modeloEnUso } from "../lib/agente.js";
 import { telefonoDomiciliario } from "../lib/domiciliarios.js";
@@ -54,6 +54,13 @@ export default async function handler(req, res) {
     }
     if (req.method === "POST") {
       if (!(await exigirSesion(req, res, ["admin"]))) return;
+      // Dejar en cero los datos de prueba (pedidos, opiniones, solicitados, unidades).
+      if (req.body?.reiniciar && typeof req.body.reiniciar === "object") {
+        const r = req.body.reiniciar;
+        const hecho = await reiniciarDatos({ pedidos: r.pedidos === true, opiniones: r.opiniones === true, solicitados: r.solicitados === true, inventario: r.inventario === true });
+        await anotar("datos de prueba reiniciados", JSON.stringify(hecho));
+        return res.status(200).json({ reiniciado: hecho });
+      }
       const [ajustes, consumo] = await Promise.all([leerAjustes(), leerConsumo()]);
       if (typeof req.body?.whatsappActivo === "boolean") {
         ajustes.whatsappActivo = req.body.whatsappActivo;

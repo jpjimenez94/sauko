@@ -642,6 +642,10 @@ input { font: inherit; color: inherit; }
         <div class="tablero" id="entregados"></div>
         <div class="acciones"><button class="btn btn--linea" id="limpiar" type="button" hidden>Limpiar entregados</button></div>
       </details>
+      <details class="entregados">
+        <summary>Cancelados <span class="cuenta num" id="n-cancelados">0</span></summary>
+        <div class="tablero" id="cancelados"></div>
+      </details>
       <div class="bitacora">
         <h2>Lo que hizo el asistente en esta pantalla</h2>
         <div class="bitacora__lista" id="bitacora"><p class="vacio">Cada búsqueda en el catálogo, cambio de pedido y lectura de comprobante queda registrada aquí.</p></div>
@@ -780,6 +784,17 @@ input { font: inherit; color: inherit; }
         </form>
         <p class="vacio" id="ia-estado" role="status"></p>
         <p class="vacio">Es una estimación hecha con lo que informa cada respuesta del asistente. El dato oficial y la recarga automática están en console.anthropic.com, en Plans &amp; Billing.</p>
+      </section>
+      <section class="caja">
+        <h2>Arrancar en producción</h2>
+        <p class="vacio">Deja en cero los datos de las pruebas. Los pedidos salen del panel y de los reportes, pero quedan guardados en el historial de la base de datos. Usuarios, ajustes, domiciliarios y productos agotados no se tocan.</p>
+        <div class="formulario">
+          <label class="rotulo"><span><input type="checkbox" id="rein-pedidos" checked> Pedidos</span></label>
+          <label class="rotulo"><span><input type="checkbox" id="rein-opiniones" checked> Opiniones de clientes</span></label>
+          <label class="rotulo"><span><input type="checkbox" id="rein-solicitados" checked> Productos solicitados</span></label>
+          <label class="rotulo"><span><input type="checkbox" id="rein-inventario" checked> Unidades del inventario (vuelven a las de arranque)</span></label>
+        </div>
+        <div class="acciones"><button class="btn btn--peligro" id="rein-boton" type="button">Dejar en cero</button><p class="vacio" id="rein-estado" role="status"></p></div>
       </section>
       <section class="bitacora">
         <h2>Diagnóstico de WhatsApp</h2>
@@ -1519,6 +1534,8 @@ function tarjeta(o) {
     o.avisoDomiciliario === 'enviado' ? 'le llegó el pedido por WhatsApp.' : o.avisoDomiciliario === 'sin turno' ? 'no se le pudo avisar porque no ha iniciado turno. Pedile que escriba "inicio turno" al WhatsApp de Sauko.' : 'no se le pudo avisar por WhatsApp. Avisale por teléfono.'));
   if (o.status === 'entregado' && (o.entregadoPor || o.fotoEntrega)) el.append(h('div', { class: 'comprobante' }, o.fotoEntrega ? verFoto(o.fotoEntrega, 'Entrega del pedido #' + o.no + (o.entregadoPor ? ' · ' + o.entregadoPor : '')) : null,
     h('div', null, 'Entregó ' + (o.entregadoPor || 'la tienda'), o.fotoPesada ? h('small', null, ' · la foto está en el WhatsApp') : null)));
+  if (o.status === 'cancelado') el.append(h('p', { class: 'domi-estado domi-estado--mal' }, h('b', null, 'Cancelado' + (o.motivoCancelacion ? ': ' + o.motivoCancelacion : '') + '. '),
+    (o.canceladoEn ? new Date(o.canceladoEn).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' · ' : '') + (o.devuelto ? 'Las unidades volvieron al inventario.' : o.descontado ? 'Las unidades no volvieron al inventario.' : 'No había descontado unidades.')));
   if (o.status === 'entregado' && o.efectivoPorEntregar > 0) {
     const caja = dosPasos(h('button', { class: 'mini', type: 'button' }, 'Recibido en caja'), '¿Llegaron ' + pesos(o.efectivoPorEntregar) + '?', () => act(o, { efectivoEnCaja: true }));
     el.append(h('p', { class: 'domi-estado domi-estado--mal' }, h('b', null, 'Efectivo por llevar a caja: ' + pesos(o.efectivoPorEntregar) + ' '), caja));
@@ -1621,6 +1638,9 @@ function renderPanel() {
   const entregados = de('entregado');
   $('entregados').replaceChildren(...(entregados.length ? entregados.map(tarjeta) : [h('p', { class: 'vacio' }, 'Todavía no hay entregas.')]));
   $('n-entregados').textContent = entregados.length; $('limpiar').hidden = !entregados.length;
+  const cancelados = panelOrders.filter(o => o.status === 'cancelado').sort((a, b) => (b.canceladoEn || 0) - (a.canceladoEn || 0));
+  $('cancelados').replaceChildren(...(cancelados.length ? cancelados.map(tarjeta) : [h('p', { class: 'vacio' }, 'Ningún pedido cancelado.')]));
+  $('n-cancelados').textContent = cancelados.length;
   $('k-confirmar').textContent = de('por_confirmar').length; $('k-alistando').textContent = de('alistando').length; $('k-camino').textContent = de('en_camino').length;
   $('t-pedidos').textContent = de('por_confirmar').length + de('alistando').length;
   const vendidos = panelOrders.filter(o => VENDIDO.includes(o.status)), ventas = vendidos.reduce((s, o) => s + (o.total || 0), 0);
@@ -1722,6 +1742,21 @@ function vistaPreviaAjustes() {
   $('aj-vista-cuenta').textContent = partes.length ? 'Así se lo dice el asistente al cliente: ' + partes.join('. ') : 'Sin cuenta ni llave, el asistente no puede dar datos para transferir.';
 }
 function pintarAjustes(n) { for (const k of [...AJ_NUMEROS, ...AJ_TEXTOS]) $('aj-' + k).value = n[k]; vistaPreviaAjustes(); }
+/* Arrancar en producción: dejar en cero los datos de prueba (solo administrador, con doble confirmación) */
+dosPasos($('rein-boton'), '¿Seguro? Esto no se puede deshacer desde el panel', () => {
+  const que = { pedidos: $('rein-pedidos').checked, opiniones: $('rein-opiniones').checked, solicitados: $('rein-solicitados').checked, inventario: $('rein-inventario').checked };
+  if (!Object.values(que).some(Boolean)) { $('rein-estado').textContent = 'Marcá al menos una cosa.'; return; }
+  pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ reiniciar: que }) }).then(d => {
+    const r = d.reiniciado || {}, partes = [];
+    if (r.pedidos != null) partes.push(r.pedidos + ' pedidos');
+    if (r.opiniones != null) partes.push(r.opiniones + ' opiniones');
+    if (r.solicitados != null) partes.push(r.solicitados + ' productos solicitados');
+    if (r.inventario) partes.push('las unidades del inventario');
+    $('rein-estado').textContent = 'Listo: quedaron en cero ' + partes.join(', ') + '.';
+    firmaTablero = ''; firmaInventario = ''; store.traerPedidos(); store.inventario().catch(() => {}); cargarOpiniones(); cargarSolicitados();
+  }).catch(err => { $('rein-estado').textContent = err.message; });
+});
+
 /* Domiciliarios: lista en Ajustes, aviso de turno en Pedidos y selección al despachar */
 let DOMIS = [];
 function pintarDomiciliarios(a) {
