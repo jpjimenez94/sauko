@@ -954,8 +954,17 @@ function paraAcompanar(items) {
   }
   return null;
 }
+// Cómo lo dice el cliente y cómo está escrito en el catálogo. Una 'media' de cigarrillos, de cualquier
+// marca, es la cajetilla de 10; y en Siigo la marca quedó escrita 'Malboro'.
+const MARCAS_CIGARRILLO = new Set(['cigarrillo', 'cigarrillos', 'cigarro', 'cigarros', 'pucho', 'lucky', 'luckyes', 'marlboro', 'malboro', 'boston', 'lym', 'starlite', 'rothmans', 'chesterfield', 'kool', 'belmont']);
+const VACIAS = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas', 'y', 'con', 'por', 'para', 'x']);
+function palabrasDeTienda(palabras) {
+  const deCigarrillos = palabras.some((t) => MARCAS_CIGARRILLO.has(t));
+  const utiles = palabras.filter((t) => !VACIAS.has(t));
+  return (utiles.length ? utiles : palabras).map((t) => (t === 'marlboro' ? 'malboro' : deCigarrillos && (t === 'media' || t === 'medias') ? 'cajetilla' : t));
+}
 function search(q, k = 8, pool = CAT) {
-  const qt = norm(q).split(' ').filter(Boolean).map(t => t.length > 4 && t.endsWith('s') ? t.slice(0, -1) : t);
+  const qt = palabrasDeTienda(norm(q).split(' ').filter(Boolean)).map(t => t.length > 4 && t.endsWith('s') ? t.slice(0, -1) : t);
   if (!qt.length) return [];
   const need = Math.ceil(qt.length * 0.5), out = [];
   for (const p of pool) {
