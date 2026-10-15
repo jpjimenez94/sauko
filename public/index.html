@@ -729,6 +729,7 @@ input { font: inherit; color: inherit; }
             <label class="rotulo">Horario prime hasta las <small>igual a la anterior = sin horario prime</small><select class="campo" id="aj-domiPrimeHasta"></select></label>
             <label class="rotulo">Valor del domicilio ($)<input class="campo" id="aj-costoDomicilio" type="number" min="0" max="100000" step="100" inputmode="numeric" required></label>
             <label class="rotulo">Valor en horario prime ($)<input class="campo" id="aj-costoDomicilioPrime" type="number" min="0" max="100000" step="100" inputmode="numeric" required></label>
+            <label class="rotulo">Bolsa por domicilio ($) <small>se suma a todos los pedidos; 0 = no se cobra</small><input class="campo" id="aj-costoBolsa" type="number" min="0" max="5000" step="50" inputmode="numeric" required></label>
           </div>
           <p class="vacio" id="aj-vista-horario"></p>
         </section>
@@ -1024,7 +1025,7 @@ newOrder();
 // Lo que la página necesita del negocio en este momento (/api/config). El costo del domicilio y si
 // hay servicio dependen de la hora, así que se vuelve a pedir antes de cada mensaje y al cerrar.
 let NEGOCIO = { costoDomicilio: 2000, datosTransferencia: '', notaHorario: '', encargo: '' };
-let DOMICILIOS = { desde: 9, normalHasta: 21, hasta: 22, costo: 2000, costoPrime: 4000 };
+let DOMICILIOS = { desde: 9, normalHasta: 21, hasta: 22, costo: 2000, costoPrime: 4000, bolsa: 200 };
 async function cargarNegocio() {
   try {
     const c = await fetch('/api/config').then(r => r.json());
@@ -1053,7 +1054,9 @@ const domicilioDe = o => o && o.domicilioFijo != null ? o.domicilioFijo : o && o
 function totals(items) {
   const subtotal = items.reduce((s, i) => s + i.qty * (i.price != null ? i.price : BY_SKU.get(i.sku).price), 0);
   const domicilio = subtotal === 0 ? 0 : domicilioDe(order);
-  return { subtotal, domicilio, total: subtotal + domicilio };
+  // Todo domicilio lleva la bolsa; queda fija al cerrar, como el domicilio.
+  const bolsa = subtotal === 0 ? 0 : (order && order.bolsaFija != null ? order.bolsaFija : DOMICILIOS.bolsa != null ? DOMICILIOS.bolsa : 200);
+  return { subtotal, domicilio, bolsa, total: subtotal + domicilio + bolsa };
 }
 function snapshot(o) {
   return { id: o.id, no: o.no, canal: 'Web', direccion: o.direccion, pago: o.pago, pagaCon: o.pagaCon, status: o.status, total: totals(o.items).total, proof: o.proof, proofMonto: o.proofMonto, rechazo: o.rechazo, hora: o.hora, programado: o.programado ? { ts: o.programado.ts } : null,
@@ -1099,7 +1102,7 @@ function renderOrder() {
     const menos = h('button', { type: 'button', 'aria-label': 'Quitar uno', disabled: !open }, '−'), mas = h('button', { type: 'button', 'aria-label': 'Agregar uno', disabled: !open }, '+');
     menos.onclick = () => setQty(i.sku, i.qty - 1); mas.onclick = () => setQty(i.sku, i.qty + 1);
     return h('div', { class: 'pedido__linea' }, h('span', null, p.name), h('span', { class: 'cant num' }, menos, String(i.qty), mas), h('span', { class: 'num' }, pesos(i.qty * p.price))); }));
-  $('pedido-meta').textContent = units ? 'Domicilio: ' + pesos(t.domicilio) + ' · Entrega: ' + (order.direccion || 'por confirmar') + (order.programado ? ' (' + order.programado.texto + ')' : '') + ' · Pago: ' + (order.pago || 'por confirmar') : 'Toca el más en un producto o pídelo por aquí.';
+  $('pedido-meta').textContent = units ? 'Domicilio: ' + pesos(t.domicilio) + (t.bolsa ? ' · Bolsa: ' + pesos(t.bolsa) : '') + ' · Entrega: ' + (order.direccion || 'por confirmar') + (order.programado ? ' (' + order.programado.texto + ')' : '') + ' · Pago: ' + (order.pago || 'por confirmar') : 'Toca el más en un producto o pídelo por aquí.';
   const idx = order.status === 'entregado' ? STEPS.length : STEPS.findIndex(s => s[0] === order.status);
   $('etapas').replaceChildren(...STEPS.map(([, label], i) => h('div', { class: 'etapa ' + (i < idx ? 'hecha' : i === idx ? 'ahora' : '') }, label)));
   pintarEstado();
@@ -1276,7 +1279,7 @@ const TOOLS = [
       const o = order;
       // La hora programada se revisa otra vez al cerrar, por si ya pasó mientras armaban el pedido.
       if (o.programado && o.programado.ts < Date.now() + 15 * 60000) throw new Error('La hora programada ya pasó o es en menos de 15 minutos. Pídele otra hora al cliente o deja el pedido para entrega inmediata.');
-      const total = totals(o.items).total; o.domicilioFijo = totals(o.items).domicilio;
+      const total = totals(o.items).total; o.domicilioFijo = totals(o.items).domicilio; o.bolsaFija = totals(o.items).bolsa;
       const entrega = o.programado ? 'La entrega quedó programada para ' + o.programado.texto + '. No prometas entrega antes de esa hora.' : NEGOCIO.encargo ? 'Es un encargo: ' + NEGOCIO.encargo.replace('Encargo: ', '') + '. No prometas entrega antes.' : 'Llega en máximo 10 minutos.';
       o.encargo = o.programado ? 'Programado: ' + o.programado.texto : NEGOCIO.encargo;
       if (o.pago === 'Contraentrega') {
@@ -1708,13 +1711,13 @@ $('cu-form').onsubmit = e => { e.preventDefault();
     .then(() => { $('cu-form').reset(); $('cu-estado').textContent = 'Contraseña cambiada. Las otras sesiones que tenías abiertas quedaron cerradas.'; }).catch(err => { $('cu-estado').textContent = err.message; }); };
 
 /* Ajustes del negocio: solo para administradores */
-const AJ_NUMEROS = ['domiDesde', 'domiHasta', 'domiPrimeHasta', 'costoDomicilio', 'costoDomicilioPrime', 'pausaMinutos'], AJ_TEXTOS = ['banco', 'cuenta', 'titular', 'llave', 'listaDePrueba'];
+const AJ_NUMEROS = ['domiDesde', 'domiHasta', 'domiPrimeHasta', 'costoDomicilio', 'costoDomicilioPrime', 'costoBolsa', 'pausaMinutos'], AJ_TEXTOS = ['banco', 'cuenta', 'titular', 'llave', 'listaDePrueba'];
 const hora12 = n => n === 24 ? '12 a.m. (medianoche)' : n === 12 ? '12 p.m. (mediodía)' : (n % 12 || 12) + (n < 12 ? ' a.m.' : ' p.m.');
 for (const id of ['domiDesde', 'domiHasta', 'domiPrimeHasta']) for (let n = id === 'domiDesde' ? 0 : 1; n <= (id === 'domiDesde' ? 23 : 24); n++) $('aj-' + id).append(h('option', { value: String(n) }, hora12(n)));
 function leerAjustesDelFormulario() { const n = {}; for (const k of AJ_NUMEROS) n[k] = Number($('aj-' + k).value); for (const k of AJ_TEXTOS) n[k] = $('aj-' + k).value.trim(); return n; }
 function vistaPreviaAjustes() {
   const n = leerAjustesDelFormulario();
-  $('aj-vista-horario').textContent = 'Domicilio a ' + pesos(n.costoDomicilio) + ' de ' + hora12(n.domiDesde) + ' a ' + hora12(n.domiHasta) + ' · ' + (n.domiPrimeHasta > n.domiHasta ? 'Horario prime a ' + pesos(n.costoDomicilioPrime) + ' de ' + hora12(n.domiHasta) + ' a ' + hora12(n.domiPrimeHasta) : 'Sin horario prime') + ' · Fuera de ese horario el pedido queda como encargo para el día siguiente.';
+  $('aj-vista-horario').textContent = 'Domicilio a ' + pesos(n.costoDomicilio) + ' de ' + hora12(n.domiDesde) + ' a ' + hora12(n.domiHasta) + ' · ' + (n.domiPrimeHasta > n.domiHasta ? 'Horario prime a ' + pesos(n.costoDomicilioPrime) + ' de ' + hora12(n.domiHasta) + ' a ' + hora12(n.domiPrimeHasta) : 'Sin horario prime') + ' · Fuera de ese horario el pedido queda como encargo para el día siguiente.' + (n.costoBolsa ? ' · Bolsa: ' + pesos(n.costoBolsa) + ' por domicilio.' : '');
   const partes = []; if (n.cuenta) partes.push([n.banco, 'cuenta ' + n.cuenta].filter(Boolean).join(', ') + (n.titular ? ', a nombre de ' + n.titular : '')); if (n.llave) partes.push('Llave: ' + n.llave);
   $('aj-vista-cuenta').textContent = partes.length ? 'Así se lo dice el asistente al cliente: ' + partes.join('. ') : 'Sin cuenta ni llave, el asistente no puede dar datos para transferir.';
 }

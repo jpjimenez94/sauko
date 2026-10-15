@@ -35,7 +35,8 @@ function pedidoLimpio(entrada, anterior) {
   const calculado = totales(items, momentoDe({ programado }));
   const mismaHora = (anterior?.programado?.ts ?? 0) === (programado?.ts ?? 0);
   const domicilio = !items.length ? 0 : (mismaHora ? anterior?.domicilioFijo : undefined) ?? calculado.domicilio;
-  const total = calculado.subtotal + domicilio;
+  const bolsa = !items.length ? 0 : anterior?.bolsaFija ?? calculado.bolsa;
+  const total = calculado.subtotal + domicilio + bolsa;
   const pago = METODOS_PAGO.includes(entrada.pago) ? entrada.pago : "";
   const direccion = texto(entrada.direccion, 160);
   const pagaCon = Math.max(0, Math.floor(Number(entrada.pagaCon) || 0));
@@ -52,6 +53,7 @@ function pedidoLimpio(entrada, anterior) {
     // Fuera del horario de domicilios queda como encargo; lo decide la hora del servidor, no la página.
     programado,
     domicilioFijo: entrada.status === "armando" ? (mismaHora ? anterior?.domicilioFijo : undefined) : domicilio,
+    bolsaFija: entrada.status === "armando" ? anterior?.bolsaFija : bolsa,
     encargo: entrada.status === "armando" ? "" : programado ? `Programado: ${programado.fijo}` : anterior?.encargo || horario().encargo,
     status: entrada.status,
     items,

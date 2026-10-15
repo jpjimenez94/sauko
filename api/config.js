@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     franja: ahora.franja,
     notaHorario: ahora.nota,
     encargo: ahora.encargo,
-    domicilios: { desde: negocioActual().domiDesde, normalHasta: negocioActual().domiHasta, hasta: negocioActual().domiPrimeHasta, costo: negocioActual().costoDomicilio, costoPrime: negocioActual().costoDomicilioPrime },
+    domicilios: { desde: negocioActual().domiDesde, normalHasta: negocioActual().domiHasta, hasta: negocioActual().domiPrimeHasta, costo: negocioActual().costoDomicilio, costoPrime: negocioActual().costoDomicilioPrime, bolsa: negocioActual().costoBolsa ?? 200 },
     metodosPago: METODOS_PAGO,
     datosTransferencia: datosTransferencia(),
   });
