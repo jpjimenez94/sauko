@@ -694,7 +694,7 @@ input { font: inherit; color: inherit; }
       </div>
       <div class="local__lista">
         <article class="fila"><div><h3>Local 23</h3><small>Hacienda Kachipay</small></div><p>Cl 60A #119C-84, Villa Fátima, Cali</p><p id="local-horario">Domicilios de 9 a.m. a 10 p.m.</p><button class="btn btn--dark" type="button" data-abrir-chat>Pedir aquí</button></article>
-        <article class="fila"><div><h3>WhatsApp</h3><small>Pedidos y domicilios</small></div><p>312 452 9879</p><p>Contraentrega o transferencia</p><a class="btn btn--dark" href="https://wa.me/573124529879">Escribir</a></article>
+        <article class="fila"><div><h3>WhatsApp</h3><small>Pedidos y domicilios con el asistente, al instante</small></div><p>313 629 5251</p><p>Contraentrega o transferencia</p><a class="btn btn--dark" href="https://wa.me/573136295251?text=Hola%2C%20quiero%20pedir%20un%20domicilio">Escribir</a></article>
         <article class="fila"><div><h3>Instagram</h3><small>Novedades y antojos</small></div><p>@sauko.store</p><p>Productos de temporada</p><a class="btn btn--dark" href="https://www.instagram.com/sauko.store/">Ver perfil</a></article>
       </div>
     </section>
@@ -1622,9 +1622,10 @@ function saludoInicial() {
 }
 function setPending(file) { pendingImg = file; $('chat-adjunto').hidden = !file; $('chat-adjunto').textContent = file ? 'Foto lista para enviar: ' + file.name : ''; if (!file) $('foto').value = ''; }
 function agentGone() { sample = null; if (!mensajes.querySelector('.msg--error')) bubble('error', SIN_AGENTE); }
-// En celular el pedido se hace por el WhatsApp de la tienda: se abre con el mensaje ya escrito,
-// incluyendo lo que el cliente haya agregado con los botones.
-const WHATSAPP_TIENDA = '573124529879';
+// En celular el pedido se hace por el WhatsApp del asistente (la eSIM, no el número de la tienda): se abre
+// con el mensaje ya escrito, incluyendo lo que el cliente haya agregado con los botones. El número de la
+// tienda (312 452 9879) queda para la atención de una persona.
+const WHATSAPP_TIENDA = '573136295251';
 const esCelular = () => /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
 function mensajeParaWhatsApp(mensaje) {
   const lineas = CLOSED.includes(order.status) ? [] : order.items.map(i => i.qty + ' x ' + BY_SKU.get(i.sku).name);
