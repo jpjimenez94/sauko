@@ -1,4 +1,4 @@
-import { bajarImagenYCloud, bajarAudioYCloud, firmaYCloudValida, textoDeBoton } from "../lib/whatsapp.js";
+import { bajarImagenYCloud, bajarAudioYCloud, firmaYCloudValida, textoDeBoton, usaYCloud } from "../lib/whatsapp.js";
 import { atenderEntrante, cuerpoCrudo } from "../lib/entrada.js";
 import { anotar, pausar } from "../lib/store.js";
 import { cargarNegocio } from "../lib/comun.js";
@@ -19,6 +19,12 @@ export default async function handler(req, res) {
     evento = JSON.parse(crudo);
   } catch {
     return res.status(400).send("Cuerpo inválido");
+  }
+  // Sin YCLOUD_FROM el asistente responde por otro número (Meta directo): un aviso que llegue por
+  // YCloud sería de otro número y no se atiende, para no contestarle a sus clientes desde el nuestro.
+  if (!usaYCloud()) {
+    await anotar("aviso de YCloud ignorado: YCloud no está configurado", evento.type);
+    return res.status(200).send("ok");
   }
 
   // Solo interesan los mensajes de clientes; estados de entrega y demás se reciben y se ignoran.
