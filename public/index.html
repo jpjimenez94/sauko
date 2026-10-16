@@ -523,10 +523,11 @@ input { font: inherit; color: inherit; }
 .wa-msg.in .wa-reacciones { left: 8px; }
 .wa-msg.out .wa-reacciones { right: 8px; }
 .wa-msg--con-reaccion { margin-bottom: 14px; }
-.wa-herramientas { position: absolute; top: 2px; display: flex; gap: 2px; opacity: 0; pointer-events: none; transition: opacity 0.12s; z-index: 2; }
-.wa-msg.in .wa-herramientas { right: -76px; }
-.wa-msg.out .wa-herramientas { left: -76px; }
-.wa-msg:hover .wa-herramientas, .wa-msg:focus-within .wa-herramientas { opacity: 1; pointer-events: auto; }
+/* Pegados al borde de la burbuja (sin hueco) y con medio segundo de gracia al salir, para alcanzarlos con el mouse */
+.wa-herramientas { position: absolute; top: 0; bottom: 0; display: flex; align-items: flex-start; gap: 4px; padding-top: 2px; opacity: 0; visibility: hidden; transition: opacity 0.15s, visibility 0s linear 0.5s; z-index: 2; }
+.wa-msg.in .wa-herramientas { left: 100%; padding-left: 8px; padding-right: 8px; }
+.wa-msg.out .wa-herramientas { right: 100%; padding-right: 8px; padding-left: 8px; flex-direction: row-reverse; }
+.wa-msg:hover .wa-herramientas, .wa-msg:focus-within .wa-herramientas, .wa-msg:has(.wa-selector) .wa-herramientas { opacity: 1; visibility: visible; transition: opacity 0.15s, visibility 0s; }
 .wa-herramientas button { width: 34px; height: 34px; border-radius: 50%; background: rgba(255, 255, 255, 0.95); display: grid; place-items: center; color: #54656f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); }
 .wa-herramientas svg { width: 18px; height: 18px; }
 .wa-selector { position: absolute; top: -46px; display: flex; gap: 2px; background: #fff; border-radius: 999px; padding: 4px 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); z-index: 5; }
@@ -574,7 +575,7 @@ input { font: inherit; color: inherit; }
   .wa.con-chat .wa-chat { display: flex; }
   .wa-volver { display: inline-grid; }
   .wa-msg { max-width: 88%; }
-  .wa-herramientas { position: static; opacity: 1; pointer-events: auto; justify-self: end; margin-top: 2px; display: none; }
+  .wa-herramientas { position: static; opacity: 1; visibility: visible; padding: 0; justify-self: end; margin-top: 2px; display: none; }
   .wa-msg.mostrar-herramientas .wa-herramientas { display: flex; }
   .wa-emojis { grid-template-columns: repeat(8, 1fr); }
 }
