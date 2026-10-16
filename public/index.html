@@ -385,7 +385,7 @@ input { font: inherit; color: inherit; }
 .menu-boton { display: none; width: 44px; height: 44px; border-radius: 12px; place-items: center; color: var(--crema); background: rgba(255, 255, 255, 0.1); }
 .menu-boton svg { width: 24px; height: 24px; }
 .barra .seccion-actual { display: none; font-family: var(--display); font-weight: 800; font-size: 1.15rem; flex: 1; line-height: 1.1; }
-.pestanas { flex-direction: column; gap: 0.2rem; padding: 1rem 0.8rem; background: #fff; border-right: 1px solid rgba(38, 21, 95, 0.1); border-bottom: 0; overflow-x: hidden; overflow-y: auto; }
+.pestanas { flex-direction: column; gap: 0.2rem; padding: 1rem 0.8rem; overscroll-behavior: contain; background: #fff; border-right: 1px solid rgba(38, 21, 95, 0.1); border-bottom: 0; overflow-x: hidden; overflow-y: auto; }
 .pestanas button[data-pest] { display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.7rem 0.9rem; border-radius: 14px; text-align: left; font-size: 0.97rem; transition: background 0.15s ease, color 0.15s ease; }
 .pestanas button[data-pest]:hover { background: var(--lila-claro); }
 .pestanas button[data-pest][aria-selected="true"] { background: var(--morado-oscuro); color: var(--crema); box-shadow: 0 8px 20px -10px rgba(38, 21, 95, 0.7); }
@@ -580,6 +580,16 @@ input { font: inherit; color: inherit; }
   .wa-emojis { grid-template-columns: repeat(8, 1fr); }
 }
 .panel:not(.bloqueado) .barra .volver-pagina { display: none; }
+.perfil-wa { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.perfil-wa__foto { display: grid; gap: 0.6rem; justify-items: center; text-align: center; }
+.perfil-wa__foto small { color: #6d6688; font-size: 0.78rem; }
+.perfil-wa__marco { width: 150px; height: 150px; border-radius: 50%; overflow: hidden; background: var(--lila-claro); display: grid; place-items: center; color: #6d6688; box-shadow: 0 10px 30px -14px rgba(38, 21, 95, 0.55), 0 0 0 4px #fff; }
+.perfil-wa__marco img { width: 100%; height: 100%; object-fit: cover; }
+.perfil-wa__subir { cursor: pointer; color: var(--morado-oscuro); border-color: var(--morado-oscuro); }
+.perfil-wa .btn { width: 100%; justify-content: center; }
+.perfil-wa .acciones .btn { width: auto; }
+#pw-form .rotulo:has(textarea), #pw-form .acciones { grid-column: 1 / -1; }
+@media (max-width: 700px) { .perfil-wa { grid-template-columns: 1fr; } }
 @media (max-width: 820px) {
   .nav__links { display: none; }
   .hero__sello { width: 118px; right: 0.8rem; bottom: 1rem; }
@@ -813,7 +823,7 @@ input { font: inherit; color: inherit; }
     <button class="btn btn--morado" type="submit">Crear y entrar</button>
     <p class="vacio" id="primer-error" role="alert"></p>
   </form>
-  <nav class="pestanas" role="tablist" aria-label="Secciones del panel" id="menu-panel">
+  <nav class="pestanas" role="tablist" aria-label="Secciones del panel" id="menu-panel" data-lenis-prevent>
     <p class="pestanas__titulo">Tienda</p>
     <button role="tab" aria-selected="true" data-pest="pedidos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>Pedidos <span class="cuenta num" id="t-pedidos">0</span></button>
     <button role="tab" aria-selected="false" data-pest="conversaciones"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19l1.4-4A8 8 0 1 1 9 18.6z"/><path d="M9 10h6M9 13.5h4"/></svg>Conversaciones <span class="cuenta num" id="t-convs" hidden>0</span></button>
@@ -874,7 +884,7 @@ input { font: inherit; color: inherit; }
               <button type="button" data-filtro="tienda" aria-pressed="false">Atiende la tienda</button>
             </div>
           </div>
-          <div class="wa-chats" id="wa-chats" role="list"></div>
+          <div class="wa-chats" id="wa-chats" role="list" data-lenis-prevent></div>
         </aside>
         <section class="wa-chat" id="wa-chat" aria-label="Chat abierto"></section>
       </div>
@@ -1011,6 +1021,28 @@ input { font: inherit; color: inherit; }
         </form>
         <p class="vacio" id="ia-estado" role="status"></p>
         <p class="vacio">Es una estimación hecha con lo que informa cada respuesta del asistente. El dato oficial y la recarga automática están en console.anthropic.com, en Plans &amp; Billing.</p>
+      </section>
+      <section class="caja" id="pw-caja">
+        <h2>Perfil de WhatsApp del asistente</h2>
+        <p class="vacio">Lo que ven los clientes al abrir el chat del asistente: la foto, la info y los datos del negocio. Un perfil completo da confianza y ayuda a que WhatsApp no lo tome por una cuenta sospechosa.</p>
+        <div class="perfil-wa">
+          <div class="perfil-wa__foto">
+            <div class="perfil-wa__marco"><img id="pw-foto" alt="Foto del perfil de WhatsApp" hidden><span id="pw-sinfoto">Sin foto</span></div>
+            <button class="btn btn--morado" id="pw-logo" type="button">Usar el logo de Sauko</button>
+            <label class="btn btn--linea perfil-wa__subir">Subir otra foto<input type="file" id="pw-archivo" accept="image/jpeg,image/png" hidden></label>
+            <small>Cuadrada, mínimo 192 × 192 px. Se ajusta sola.</small>
+          </div>
+          <form class="formulario" id="pw-form">
+            <label class="rotulo">Info <small>la frase corta debajo del nombre, máximo 139 letras</small><input class="campo" id="pw-about" type="text" maxlength="139"></label>
+            <label class="rotulo">Descripción<textarea class="campo" id="pw-description" maxlength="512" rows="3"></textarea></label>
+            <label class="rotulo">Dirección<input class="campo" id="pw-address" type="text" maxlength="256"></label>
+            <label class="rotulo">Correo<input class="campo" id="pw-email" type="email" maxlength="128"></label>
+            <label class="rotulo">Sitio web 1<input class="campo" id="pw-web1" type="url" maxlength="256" placeholder="https://www.saukostoreminimarket.com"></label>
+            <label class="rotulo">Sitio web 2<input class="campo" id="pw-web2" type="url" maxlength="256" placeholder="https://www.instagram.com/sauko.store"></label>
+            <label class="rotulo">Categoría<select class="campo" id="pw-vertical"><option value="GROCERY">Supermercado y comestibles</option><option value="RETAIL">Tienda</option><option value="RESTAURANT">Restaurante</option><option value="OTHER">Otro</option></select></label>
+            <div class="acciones"><button class="btn btn--morado" type="submit">Guardar perfil</button><p class="vacio" id="pw-estado" role="status"></p></div>
+          </form>
+        </div>
       </section>
       <section class="caja">
         <h2>Arrancar en producción</h2>
@@ -1890,7 +1922,7 @@ function verPestana(nombre) {
   if (nombre === 'conversaciones') { cargarChats(); if (CONV.abierto) cargarChat(true); else if (!$('wa-chat').childElementCount) pintarBienvenida(); }
   document.querySelectorAll('.vista[id^="pest-"]').forEach(v => { v.hidden = v.id !== 'pest-' + nombre; });
   if (nombre === 'usuarios') cargarUsuarios();
-  if (nombre === 'ajustes') cargarAjustes();
+  if (nombre === 'ajustes') { cargarAjustes(); if (YO && YO.rol === 'admin') cargarPerfilWA(); }
   if (nombre === 'solicitados') cargarSolicitados();
   if (nombre === 'resumen') cargarOpiniones();
 }
@@ -2283,6 +2315,50 @@ setInterval(() => {
   if (enConv || CONV.tick % 3 === 0) cargarChats();
   if (enConv && CONV.abierto) cargarChat();
 }, 3500);
+
+/* Perfil de WhatsApp del asistente (lo que ven los clientes), por la API de Meta */
+const urlPerfil = accion => '/api/whatsapp?accion=' + accion;
+function pintarPerfilWA(p) {
+  p = p || {};
+  $('pw-about').value = (p.about || '').trim(); $('pw-description').value = p.description || ''; $('pw-address').value = p.address || ''; $('pw-email').value = p.email || '';
+  const webs = p.websites || []; $('pw-web1').value = webs[0] || ''; $('pw-web2').value = webs[1] || '';
+  $('pw-vertical').value = ['GROCERY', 'RETAIL', 'RESTAURANT'].includes(p.vertical) ? p.vertical : 'OTHER';
+  $('pw-foto').hidden = !p.profile_picture_url; $('pw-sinfoto').hidden = Boolean(p.profile_picture_url);
+  if (p.profile_picture_url) $('pw-foto').src = p.profile_picture_url;
+}
+function cargarPerfilWA() {
+  $('pw-estado').textContent = 'Cargando el perfil…';
+  pedir(urlPerfil('perfil')).then(d => { pintarPerfilWA(d.perfil); $('pw-estado').textContent = ''; }).catch(e => { $('pw-estado').textContent = 'No se pudo leer el perfil: ' + e.message; });
+}
+$('pw-form').addEventListener('submit', e => {
+  e.preventDefault();
+  $('pw-estado').textContent = 'Guardando…';
+  const cuerpo = { about: $('pw-about').value, description: $('pw-description').value, address: $('pw-address').value, email: $('pw-email').value, websites: [$('pw-web1').value, $('pw-web2').value].filter(Boolean), vertical: $('pw-vertical').value };
+  pedir(urlPerfil('perfil'), { method: 'POST', body: JSON.stringify(cuerpo) }).then(d => { pintarPerfilWA(d.perfil); $('pw-estado').textContent = 'Listo: así lo ven los clientes en WhatsApp.'; }).catch(err => { $('pw-estado').textContent = err.message; });
+});
+// La foto se deja cuadrada de 640 × 640 (sin recortar el logo, con fondo blanco) antes de subirla.
+function fotoCuadrada(src) {
+  return new Promise((ok, mal) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = c.height = 640;
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 640, 640);
+      const k = Math.min(600 / img.width, 600 / img.height), w = img.width * k, hh = img.height * k;
+      ctx.drawImage(img, (640 - w) / 2, (640 - hh) / 2, w, hh);
+      ok(c.toDataURL('image/jpeg', 0.9).split(',')[1]);
+    };
+    img.onerror = () => mal(new Error('No se pudo leer la foto.'));
+    img.src = src;
+  });
+}
+function subirFotoWA(src) {
+  $('pw-estado').textContent = 'Subiendo la foto…';
+  return fotoCuadrada(src).then(base64 => pedir(urlPerfil('perfil-foto'), { method: 'POST', body: JSON.stringify({ tipo: 'image/jpeg', base64 }) }))
+    .then(d => { pintarPerfilWA(d.perfil); $('pw-estado').textContent = 'Foto actualizada. En los celulares puede tardar unos minutos en verse.'; })
+    .catch(err => { $('pw-estado').textContent = err.message; });
+}
+$('pw-logo').onclick = () => subirFotoWA('logo.png');
+$('pw-archivo').onchange = () => { const f = $('pw-archivo').files[0]; $('pw-archivo').value = ''; if (!f) return; const url = URL.createObjectURL(f); subirFotoWA(url).finally(() => URL.revokeObjectURL(url)); };
 
 /* Opiniones: lo que respondieron los clientes al entregarles el pedido */
 function cargarOpiniones() {
