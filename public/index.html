@@ -350,8 +350,8 @@ input { font: inherit; color: inherit; }
 .interruptor { padding: 0.55rem 1rem; border-radius: 999px; font-weight: 700; border: 2px solid var(--lila); color: var(--crema); white-space: nowrap; }
 .interruptor[aria-pressed="true"] { background: var(--verde-wa); border-color: var(--verde-wa); color: #fff; }
 .pestanas { display: flex; gap: 0.4rem; padding: 0.6rem clamp(1rem, 4vw, 2rem); background: #fff; border-bottom: 1px solid rgba(0, 0, 0, 0.08); overflow-x: auto; }
-.pestanas button { padding: 0.5rem 1rem; border-radius: 999px; font-weight: 700; white-space: nowrap; color: var(--morado-oscuro); }
-.pestanas button[aria-selected="true"] { background: var(--morado-oscuro); color: var(--crema); }
+.pestanas button[data-pest] { padding: 0.5rem 1rem; border-radius: 999px; font-weight: 700; white-space: nowrap; color: var(--morado-oscuro); }
+.pestanas button[data-pest][aria-selected="true"] { background: var(--morado-oscuro); color: var(--crema); }
 .cuenta { background: var(--sol); color: var(--tinta); border-radius: 999px; padding: 0 0.5rem; font-size: 0.8rem; margin-left: 0.3rem; }
 .vista { display: grid; gap: 1.2rem; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.8rem; }
@@ -380,6 +380,205 @@ input { font: inherit; color: inherit; }
 .subir img { max-height: 240px; border-radius: 10px; }
 .entregados summary { cursor: pointer; font-weight: 700; }
 .entregados .tablero { margin-top: 0.8rem; }
+/* Menú del panel: barra lateral fija en computador y menú hamburguesa en celular, siempre a mano */
+.panel { --alto-barra: 72px; --ancho-menu: 236px; }
+.menu-boton { display: none; width: 44px; height: 44px; border-radius: 12px; place-items: center; color: var(--crema); background: rgba(255, 255, 255, 0.1); }
+.menu-boton svg { width: 24px; height: 24px; }
+.barra .seccion-actual { display: none; font-family: var(--display); font-weight: 800; font-size: 1.15rem; flex: 1; line-height: 1.1; }
+.pestanas { flex-direction: column; gap: 0.2rem; padding: 1rem 0.8rem; background: #fff; border-right: 1px solid rgba(38, 21, 95, 0.1); border-bottom: 0; overflow-x: hidden; overflow-y: auto; }
+.pestanas button[data-pest] { display: flex; align-items: center; gap: 0.75rem; width: 100%; padding: 0.7rem 0.9rem; border-radius: 14px; text-align: left; font-size: 0.97rem; transition: background 0.15s ease, color 0.15s ease; }
+.pestanas button[data-pest]:hover { background: var(--lila-claro); }
+.pestanas button[data-pest][aria-selected="true"] { background: var(--morado-oscuro); color: var(--crema); box-shadow: 0 8px 20px -10px rgba(38, 21, 95, 0.7); }
+.pestanas button[data-pest] svg { width: 21px; height: 21px; flex: none; }
+.pestanas button[data-pest] .cuenta { margin-left: auto; }
+.pestanas__titulo { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: #8a83a3; padding: 0.4rem 0.9rem 0.2rem; font-weight: 700; }
+.pestanas__pie { margin-top: auto; display: grid; gap: 0.5rem; padding: 1rem 0.4rem 0.2rem; border-top: 1px solid rgba(38, 21, 95, 0.08); }
+.pestanas__pie .quien { font-size: 0.85rem; color: #6d6688; padding: 0 0.5rem; }
+.pestanas__pie .btn { width: 100%; justify-content: center; }
+.pestanas__pie .btn--linea { color: var(--morado-oscuro); border-color: var(--morado-oscuro); }
+.menu-fondo { display: none; }
+@media (min-width: 901px) {
+  .panel:not(.bloqueado) { display: grid; grid-template-columns: var(--ancho-menu) minmax(0, 1fr); grid-template-rows: auto 1fr; align-items: start; }
+  .panel:not(.bloqueado) > .barra { grid-column: 1 / -1; }
+  .panel:not(.bloqueado) > .pestanas { grid-column: 1; position: sticky; top: var(--alto-barra); height: calc(100svh - var(--alto-barra)); display: flex; }
+  .panel:not(.bloqueado) > main { grid-column: 2; width: 100%; }
+}
+@media (max-width: 900px) {
+  .menu-boton { display: inline-grid; }
+  .barra h1 { display: none; }
+  .barra .seccion-actual { display: block; }
+  .barra .logo { display: none; }
+  .pestanas { position: fixed; z-index: 60; top: 0; bottom: 0; left: 0; width: min(84vw, 300px); padding-top: calc(env(safe-area-inset-top, 0px) + 1rem); transform: translateX(-104%); transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); box-shadow: 20px 0 60px -20px rgba(0, 0, 0, 0.4); display: flex; }
+  .panel.menu-abierto .pestanas { transform: none; }
+  .panel.menu-abierto .menu-fondo { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(20, 12, 50, 0.45); backdrop-filter: blur(2px); border: 0; }
+}
+
+/* Conversaciones: el WhatsApp de la tienda dentro del panel */
+.wa { --wa-verde: #d9fdd3; --wa-lila: #ece5ff; --wa-fondo: #efeae2; --wa-gris: #667781; --wa-azul: #53bdeb; display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); height: calc(100svh - var(--alto-barra) - 3rem); min-height: 560px; background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 24px 60px -30px rgba(38, 21, 95, 0.45), 0 0 0 1px rgba(38, 21, 95, 0.08); }
+.wa-lista { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid #e9edef; background: #fff; }
+.wa-lista__cabeza { padding: 1rem 1rem 0.8rem; background: linear-gradient(135deg, var(--morado-oscuro), var(--morado)); color: #fff; display: grid; gap: 0.7rem; }
+.wa-lista__cabeza h2 { font-family: var(--display); font-weight: 800; font-size: 1.35rem; display: flex; align-items: center; gap: 0.5rem; }
+.wa-lista__cabeza h2 small { font: 600 0.75rem var(--texto); background: rgba(255, 255, 255, 0.18); border-radius: 999px; padding: 0.15rem 0.55rem; }
+.wa-buscar { display: flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.16); border-radius: 12px; padding: 0.45rem 0.8rem; }
+.wa-buscar svg { width: 18px; height: 18px; opacity: 0.8; flex: none; }
+.wa-buscar input { border: 0; background: none; color: #fff; font: inherit; width: 100%; outline: none; }
+.wa-buscar input::placeholder { color: rgba(255, 255, 255, 0.7); }
+.wa-filtros { display: flex; gap: 0.4rem; }
+.wa-filtros button { font-size: 0.8rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: #fff; }
+.wa-filtros button[aria-pressed="true"] { background: var(--sol); color: var(--tinta); }
+.wa-chats { overflow-y: auto; flex: 1; min-height: 0; }
+.wa-chat-item { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; width: 100%; padding: 0.7rem 1rem; text-align: left; border-bottom: 1px solid #f0f2f5; transition: background 0.12s; }
+.wa-chat-item:hover { background: #f5f6f6; }
+.wa-chat-item[aria-current="true"] { background: #f0ebff; }
+.wa-avatar { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 1.05rem; letter-spacing: 0.02em; position: relative; flex: none; }
+.wa-avatar--chico { width: 40px; height: 40px; font-size: 0.95rem; }
+.wa-avatar i { position: absolute; right: -2px; bottom: -2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 11px; font-style: normal; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); }
+.wa-chat-item__centro { min-width: 0; display: grid; gap: 0.1rem; }
+.wa-chat-item__nombre { font-weight: 700; color: #111b21; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-chat-item__ultimo { font-size: 0.86rem; color: var(--wa-gris); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 0.25rem; }
+.wa-chat-item__ultimo svg { width: 16px; height: 16px; flex: none; }
+.wa-chat-item__lado { display: grid; justify-items: end; gap: 0.3rem; font-size: 0.75rem; color: var(--wa-gris); }
+.wa-chat-item__lado b { background: #25d366; color: #fff; border-radius: 999px; min-width: 20px; height: 20px; padding: 0 6px; display: grid; place-items: center; font-size: 0.72rem; }
+.wa-chat-item--nuevo .wa-chat-item__lado { color: #1fa855; font-weight: 700; }
+.wa-etiqueta { font-size: 0.68rem; font-weight: 700; padding: 0.05rem 0.45rem; border-radius: 999px; background: var(--sol); color: var(--tinta); }
+.wa-vacio { padding: 2.5rem 1.5rem; text-align: center; color: var(--wa-gris); display: grid; gap: 0.6rem; justify-items: center; }
+.wa-vacio svg { width: 64px; height: 64px; opacity: 0.35; }
+
+.wa-chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--wa-fondo); position: relative; }
+.wa-chat__cabeza { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; background: #f0f2f5; border-bottom: 1px solid #e2e5e8; min-height: 64px; flex-wrap: wrap; }
+.wa-volver { display: none; width: 38px; height: 38px; border-radius: 50%; place-items: center; color: #54656f; }
+.wa-volver svg { width: 22px; height: 22px; }
+.wa-chat__quien { flex: 1; min-width: 0; display: grid; }
+.wa-chat__quien strong { color: #111b21; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-chat__quien small { color: var(--wa-gris); font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wa-modo { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.wa-chip { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 700; padding: 0.35rem 0.75rem; border-radius: 999px; background: #fff; color: var(--morado-oscuro); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.wa-chip--tienda { background: var(--sol); color: var(--tinta); }
+.wa-chip--bot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #25d366; box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.25); }
+.wa-accion { font-size: 0.8rem; font-weight: 700; padding: 0.38rem 0.85rem; border-radius: 999px; background: var(--morado-oscuro); color: #fff; }
+.wa-accion--suave { background: #fff; color: var(--morado-oscuro); box-shadow: inset 0 0 0 1.5px var(--morado-oscuro); }
+.wa-mensajes { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 1rem clamp(0.6rem, 4%, 3.5rem) 0.6rem; display: flex; flex-direction: column; gap: 2px; background-color: var(--wa-fondo); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23d6cfc4' stroke-width='1.6' stroke-linecap='round' opacity='.55'%3E%3Cpath d='M14 18h16l-2 14H16z'/%3E%3Ccircle cx='86' cy='22' r='7'/%3E%3Cpath d='M60 58c6-8 18-8 24 0'/%3E%3Cpath d='M20 86l8-8 8 8-8 8z'/%3E%3Cpath d='M92 84h14v14H92z'/%3E%3Cpath d='M50 100c0-6 10-6 10 0'/%3E%3Cpath d='M44 24l6 6M50 24l-6 6'/%3E%3C/g%3E%3C/svg%3E"); }
+.wa-dia { align-self: center; margin: 0.8rem 0 0.5rem; font-size: 0.75rem; font-weight: 700; color: #54656f; background: #fff; border-radius: 8px; padding: 0.3rem 0.75rem; box-shadow: 0 1px 1px rgba(11, 20, 26, 0.12); text-transform: uppercase; letter-spacing: 0.04em; }
+.wa-aviso { align-self: center; max-width: 85%; text-align: center; font-size: 0.8rem; color: #54656f; background: #fff6d6; border-radius: 8px; padding: 0.4rem 0.8rem; margin: 0.4rem 0; box-shadow: 0 1px 1px rgba(11, 20, 26, 0.1); }
+.wa-msg { position: relative; max-width: min(78%, 560px); display: grid; margin-top: 2px; }
+.wa-msg--anim { animation: waEntra 0.22s ease both; }
+.wa-msg--nuevo-grupo { margin-top: 8px; }
+.wa-msg.in { align-self: flex-start; }
+.wa-msg.out { align-self: flex-end; }
+@keyframes waEntra { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
+.wa-burbuja { position: relative; padding: 0.4rem 0.55rem 0.3rem 0.6rem; border-radius: 10px; background: #fff; box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13); color: #111b21; font-size: 0.94rem; line-height: 1.38; min-width: 86px; overflow-wrap: anywhere; }
+.wa-msg.out .wa-burbuja { background: var(--wa-verde); }
+.wa-msg.out.asistente .wa-burbuja { background: var(--wa-lila); }
+.wa-msg--nuevo-grupo.in .wa-burbuja { border-top-left-radius: 0; }
+.wa-msg--nuevo-grupo.out .wa-burbuja { border-top-right-radius: 0; }
+.wa-msg--nuevo-grupo.in .wa-burbuja::before, .wa-msg--nuevo-grupo.out .wa-burbuja::before { content: ""; position: absolute; top: 0; width: 10px; height: 13px; }
+.wa-msg--nuevo-grupo.in .wa-burbuja::before { left: -8px; background: #fff; clip-path: polygon(100% 0, 0 0, 100% 100%); }
+.wa-msg--nuevo-grupo.out .wa-burbuja::before { right: -8px; background: var(--wa-verde); clip-path: polygon(0 0, 100% 0, 0 100%); }
+.wa-msg--nuevo-grupo.out.asistente .wa-burbuja::before { background: var(--wa-lila); }
+.wa-autor { font-size: 0.74rem; font-weight: 800; margin-bottom: 0.1rem; display: flex; gap: 0.3rem; align-items: center; }
+.wa-autor--bot { color: var(--morado); }
+.wa-autor--tienda { color: #0f8a5f; }
+.wa-texto { white-space: pre-wrap; }
+.wa-pie { float: right; display: inline-flex; align-items: center; gap: 0.2rem; margin: 0.35rem 0 -0.15rem 0.6rem; font-size: 0.69rem; color: var(--wa-gris); line-height: 1; white-space: nowrap; }
+.wa-pie svg { width: 16px; height: 11px; }
+.wa-pie .leido { color: var(--wa-azul); }
+.wa-pie .fallo { color: var(--mal); font-weight: 800; }
+.wa-boton-tocado { display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 600; }
+.wa-boton-tocado::before { content: "👆"; }
+.wa-botones { display: grid; gap: 2px; margin-top: 2px; }
+.wa-botones span { background: #fff; color: #027eb5; text-align: center; font-weight: 600; font-size: 0.88rem; padding: 0.45rem; border-radius: 8px; box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13); }
+.wa-msg.out .wa-botones span { background: rgba(255, 255, 255, 0.85); }
+.wa-cita { display: grid; gap: 0.05rem; border-left: 4px solid var(--morado); background: rgba(11, 20, 26, 0.05); border-radius: 6px; padding: 0.3rem 0.5rem; margin-bottom: 0.3rem; font-size: 0.82rem; cursor: pointer; }
+.wa-cita b { color: var(--morado); font-size: 0.76rem; }
+.wa-cita span { color: #54656f; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.wa-foto { display: block; margin: -0.15rem -0.3rem 0.25rem; border-radius: 8px; overflow: hidden; cursor: zoom-in; background: #dfe5e7; min-height: 120px; max-width: 330px; }
+.wa-foto img { display: block; width: 100%; max-height: 360px; object-fit: cover; }
+.wa-sticker { width: 150px; height: 150px; object-fit: contain; display: block; }
+.wa-video { display: block; width: 100%; max-width: 330px; border-radius: 8px; margin: -0.15rem -0.3rem 0.25rem; background: #000; }
+.wa-doc { display: flex; align-items: center; gap: 0.6rem; background: rgba(11, 20, 26, 0.05); border-radius: 8px; padding: 0.6rem 0.7rem; color: #111b21; text-decoration: none; margin-bottom: 0.2rem; }
+.wa-doc b { font-size: 1.5rem; }
+.wa-mapa { display: grid; gap: 0.2rem; text-decoration: none; color: #111b21; margin-bottom: 0.2rem; }
+.wa-mapa__img { height: 120px; border-radius: 8px; background: linear-gradient(135deg, #cfe9c8, #a8d5f2); display: grid; place-items: center; font-size: 2.2rem; }
+.wa-voz { display: grid; grid-template-columns: auto auto minmax(140px, 1fr); align-items: center; gap: 0.6rem; min-width: min(300px, 62vw); padding: 0.2rem 0.1rem 0; }
+.wa-voz__foto { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: #dfe5e7; color: #54656f; position: relative; }
+.wa-voz__foto svg { width: 22px; height: 22px; }
+.wa-voz__foto i { position: absolute; right: -3px; bottom: -2px; color: #25d366; font-style: normal; }
+.wa-msg.out .wa-voz__foto { order: 2; }
+.wa-play { width: 36px; height: 36px; display: grid; place-items: center; color: #54656f; border-radius: 50%; }
+.wa-play svg { width: 26px; height: 26px; }
+.wa-play:hover { background: rgba(0, 0, 0, 0.05); }
+.wa-onda { display: grid; gap: 0.25rem; }
+.wa-barras { display: flex; align-items: center; gap: 2px; height: 30px; cursor: pointer; position: relative; }
+.wa-barras span { flex: 1; min-width: 2px; border-radius: 2px; background: #c4cdd2; transition: background 0.1s; }
+.wa-barras span.ya { background: #4fb3f6; }
+.wa-msg.out .wa-barras span { background: #a6c9a1; }
+.wa-msg.out.asistente .wa-barras span { background: #c2b5ea; }
+.wa-msg.out .wa-barras span.ya { background: #1fa855; }
+.wa-onda__pie { display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; color: var(--wa-gris); }
+.wa-velocidad { font-size: 0.7rem; font-weight: 800; padding: 0.05rem 0.45rem; border-radius: 999px; background: rgba(11, 20, 26, 0.08); color: #54656f; }
+.wa-transcripcion { margin-top: 0.35rem; font-size: 0.82rem; color: #3b4a54; background: rgba(11, 20, 26, 0.045); border-radius: 6px; padding: 0.35rem 0.5rem; }
+.wa-transcripcion summary { cursor: pointer; font-weight: 700; color: var(--morado); font-size: 0.76rem; list-style: none; }
+.wa-transcripcion summary::-webkit-details-marker { display: none; }
+.wa-reacciones { position: absolute; bottom: -12px; display: flex; gap: 2px; background: #fff; border-radius: 999px; padding: 1px 5px; font-size: 0.85rem; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); z-index: 1; }
+.wa-msg.in .wa-reacciones { left: 8px; }
+.wa-msg.out .wa-reacciones { right: 8px; }
+.wa-msg--con-reaccion { margin-bottom: 14px; }
+.wa-herramientas { position: absolute; top: 2px; display: flex; gap: 2px; opacity: 0; pointer-events: none; transition: opacity 0.12s; z-index: 2; }
+.wa-msg.in .wa-herramientas { right: -76px; }
+.wa-msg.out .wa-herramientas { left: -76px; }
+.wa-msg:hover .wa-herramientas, .wa-msg:focus-within .wa-herramientas { opacity: 1; pointer-events: auto; }
+.wa-herramientas button { width: 34px; height: 34px; border-radius: 50%; background: rgba(255, 255, 255, 0.95); display: grid; place-items: center; color: #54656f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); }
+.wa-herramientas svg { width: 18px; height: 18px; }
+.wa-selector { position: absolute; top: -46px; display: flex; gap: 2px; background: #fff; border-radius: 999px; padding: 4px 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); z-index: 5; }
+.wa-msg.in .wa-selector { left: 0; }
+.wa-msg.out .wa-selector { right: 0; }
+.wa-selector button { font-size: 1.35rem; width: 38px; height: 38px; border-radius: 50%; transition: transform 0.1s; }
+.wa-selector button:hover { transform: scale(1.25); background: #f0f2f5; }
+.wa-escribir { background: #f0f2f5; padding: 0.55rem 0.8rem; display: grid; gap: 0.4rem; border-top: 1px solid #e2e5e8; }
+.wa-escribir__fila { display: flex; align-items: flex-end; gap: 0.45rem; }
+.wa-escribir textarea { flex: 1; resize: none; border: 0; border-radius: 22px; padding: 0.7rem 1rem; font: inherit; font-size: 0.95rem; line-height: 1.35; max-height: 140px; min-height: 44px; background: #fff; outline: none; box-shadow: 0 1px 1px rgba(11, 20, 26, 0.08); }
+.wa-icono { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #54656f; flex: none; }
+.wa-icono:hover { background: rgba(11, 20, 26, 0.06); }
+.wa-icono svg { width: 24px; height: 24px; }
+.wa-enviar { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: #1fa855; flex: none; box-shadow: 0 4px 12px -4px rgba(31, 168, 85, 0.8); transition: transform 0.12s; }
+.wa-enviar:hover { transform: scale(1.05); }
+.wa-enviar:disabled { background: #9fbfae; box-shadow: none; transform: none; }
+.wa-enviar svg { width: 22px; height: 22px; }
+.wa-responder, .wa-adjunto { display: flex; align-items: center; gap: 0.6rem; background: #fff; border-radius: 12px; padding: 0.45rem 0.6rem; border-left: 4px solid var(--morado); }
+.wa-responder div, .wa-adjunto div { flex: 1; min-width: 0; font-size: 0.85rem; }
+.wa-responder b { color: var(--morado); display: block; font-size: 0.78rem; }
+.wa-responder span { color: #54656f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.wa-adjunto img { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; }
+.wa-quitar { width: 30px; height: 30px; border-radius: 50%; color: #54656f; font-size: 1.2rem; }
+.wa-emojis { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; background: #fff; border-radius: 14px; padding: 0.5rem; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.wa-emojis button { font-size: 1.35rem; padding: 0.2rem; border-radius: 8px; }
+.wa-emojis button:hover { background: #f0f2f5; }
+.wa-cerrada { display: flex; gap: 0.6rem; align-items: center; background: #fff6d6; color: #5c4a00; border-radius: 12px; padding: 0.6rem 0.8rem; font-size: 0.86rem; }
+.wa-ventana { font-size: 0.74rem; color: var(--wa-gris); display: flex; justify-content: space-between; gap: 0.6rem; padding: 0 0.3rem; }
+.wa-error { font-size: 0.82rem; color: var(--mal); padding: 0 0.3rem; }
+.wa-bienvenida { flex: 1; display: grid; place-items: center; text-align: center; padding: 2rem; background: #f8f6ff; }
+.wa-bienvenida > div { display: grid; gap: 0.8rem; justify-items: center; max-width: 420px; color: #54656f; }
+.wa-bienvenida h3 { font-family: var(--display); font-size: 1.8rem; color: var(--morado-oscuro); }
+.wa-bienvenida__arte { width: 140px; height: 140px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 30% 30%, #fff, var(--lila)); box-shadow: 0 20px 40px -20px rgba(91, 53, 201, 0.6); }
+.wa-bienvenida__arte svg { width: 70px; height: 70px; color: var(--morado); }
+.wa-leyenda { display: flex; gap: 0.8rem; flex-wrap: wrap; justify-content: center; font-size: 0.78rem; }
+.wa-leyenda span { display: inline-flex; align-items: center; gap: 0.35rem; }
+.wa-leyenda i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08); }
+.wa-bajar { position: absolute; right: 18px; bottom: 96px; width: 42px; height: 42px; border-radius: 50%; background: #fff; color: #54656f; display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); z-index: 3; }
+.wa-bajar svg { width: 22px; height: 22px; }
+.wa-bajar b { position: absolute; top: -6px; right: -4px; background: #25d366; color: #fff; font-size: 0.68rem; border-radius: 999px; min-width: 18px; height: 18px; display: grid; place-items: center; padding: 0 4px; }
+@media (max-width: 900px) {
+  .wa { grid-template-columns: 1fr; height: calc(100svh - var(--alto-barra) - 1.5rem); border-radius: 18px; }
+  .wa .wa-chat { display: none; }
+  .wa.con-chat .wa-lista { display: none; }
+  .wa.con-chat .wa-chat { display: flex; }
+  .wa-volver { display: inline-grid; }
+  .wa-msg { max-width: 88%; }
+  .wa-herramientas { position: static; opacity: 1; pointer-events: auto; justify-self: end; margin-top: 2px; display: none; }
+  .wa-msg.mostrar-herramientas .wa-herramientas { display: flex; }
+  .wa-emojis { grid-template-columns: repeat(8, 1fr); }
+}
+.panel:not(.bloqueado) .barra .volver-pagina { display: none; }
 @media (max-width: 820px) {
   .nav__links { display: none; }
   .hero__sello { width: 118px; right: 0.8rem; bottom: 1rem; }
@@ -588,13 +787,13 @@ input { font: inherit; color: inherit; }
 
 <div class="panel bloqueado" id="panel" hidden>
   <header class="barra">
+    <button class="menu-boton" id="menu-boton" type="button" aria-label="Abrir el menú" aria-controls="menu-panel" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <span class="logo"><img src="logo.png" alt="" width="46" height="46"></span>
     <h1>Panel de la tienda</h1>
+    <span class="seccion-actual" id="seccion-actual">Pedidos</span>
     <span class="vivo"><i></i><span id="vivo-texto">En vivo</span></span>
     <button class="interruptor" id="wa-interruptor" type="button" aria-pressed="false" hidden>WhatsApp: apagado</button>
-    <span class="quien" id="quien" hidden></span>
-    <button class="btn btn--linea" id="salir" type="button" hidden>Salir</button>
-    <button class="btn btn--sol" type="button" data-vista="tienda">Volver a la página</button>
+    <button class="btn btn--sol volver-pagina" type="button" data-vista="tienda">Volver a la página</button>
   </header>
   <form class="acceso-pin" id="login-form">
     <h2>Entrar al panel</h2>
@@ -613,16 +812,26 @@ input { font: inherit; color: inherit; }
     <button class="btn btn--morado" type="submit">Crear y entrar</button>
     <p class="vacio" id="primer-error" role="alert"></p>
   </form>
-  <nav class="pestanas" role="tablist" aria-label="Secciones del panel">
-    <button role="tab" aria-selected="true" data-pest="pedidos">Pedidos <span class="cuenta num" id="t-pedidos">0</span></button>
-    <button role="tab" aria-selected="false" data-pest="resumen">Resumen</button>
-    <button role="tab" aria-selected="false" data-pest="inventario">Inventario <span class="cuenta num" id="t-agotados" hidden>0</span></button>
-    <button role="tab" aria-selected="false" data-pest="solicitados">Solicitados <span class="cuenta num" id="t-solicitados" hidden>0</span></button>
-    <button role="tab" aria-selected="false" data-pest="estanteria">Estantería</button>
-    <button role="tab" aria-selected="false" data-pest="ajustes" data-solo-admin hidden>Ajustes</button>
-    <button role="tab" aria-selected="false" data-pest="usuarios" data-solo-admin hidden>Usuarios</button>
-    <button role="tab" aria-selected="false" data-pest="cuenta">Mi cuenta</button>
+  <nav class="pestanas" role="tablist" aria-label="Secciones del panel" id="menu-panel">
+    <p class="pestanas__titulo">Tienda</p>
+    <button role="tab" aria-selected="true" data-pest="pedidos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>Pedidos <span class="cuenta num" id="t-pedidos">0</span></button>
+    <button role="tab" aria-selected="false" data-pest="conversaciones"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19l1.4-4A8 8 0 1 1 9 18.6z"/><path d="M9 10h6M9 13.5h4"/></svg>Conversaciones <span class="cuenta num" id="t-convs" hidden>0</span></button>
+    <button role="tab" aria-selected="false" data-pest="resumen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Resumen</button>
+    <p class="pestanas__titulo">Productos</p>
+    <button role="tab" aria-selected="false" data-pest="inventario"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7M12 11v10"/></svg>Inventario <span class="cuenta num" id="t-agotados" hidden>0</span></button>
+    <button role="tab" aria-selected="false" data-pest="solicitados"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg>Solicitados <span class="cuenta num" id="t-solicitados" hidden>0</span></button>
+    <button role="tab" aria-selected="false" data-pest="estanteria"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Estantería</button>
+    <p class="pestanas__titulo">Cuenta</p>
+    <button role="tab" aria-selected="false" data-pest="ajustes" data-solo-admin hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes</button>
+    <button role="tab" aria-selected="false" data-pest="usuarios" data-solo-admin hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/></svg>Usuarios</button>
+    <button role="tab" aria-selected="false" data-pest="cuenta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Mi cuenta</button>
+    <div class="pestanas__pie">
+      <span class="quien" id="quien" hidden></span>
+      <button class="btn btn--linea" id="salir" type="button" hidden>Salir</button>
+      <button class="btn btn--sol" type="button" data-vista="tienda">Volver a la página</button>
+    </div>
   </nav>
+  <button class="menu-fondo" id="menu-fondo" type="button" aria-label="Cerrar el menú"></button>
   <main>
     <div class="vista" id="pest-pedidos">
       <section class="kpis" aria-label="Resumen rápido">
@@ -652,6 +861,23 @@ input { font: inherit; color: inherit; }
       </div>
     </div>
 
+    <div class="vista" id="pest-conversaciones" hidden>
+      <div class="wa" id="wa">
+        <aside class="wa-lista" aria-label="Chats">
+          <div class="wa-lista__cabeza">
+            <h2>Conversaciones <small>WhatsApp</small></h2>
+            <label class="wa-buscar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="wa-buscar" type="search" placeholder="Buscar nombre, número o mensaje" aria-label="Buscar conversación" autocomplete="off"></label>
+            <div class="wa-filtros" role="group" aria-label="Filtrar chats">
+              <button type="button" data-filtro="todos" aria-pressed="true">Todos</button>
+              <button type="button" data-filtro="noleidos" aria-pressed="false">No leídos</button>
+              <button type="button" data-filtro="tienda" aria-pressed="false">Atiende la tienda</button>
+            </div>
+          </div>
+          <div class="wa-chats" id="wa-chats" role="list"></div>
+        </aside>
+        <section class="wa-chat" id="wa-chat" aria-label="Chat abierto"></section>
+      </div>
+    </div>
     <div class="vista" id="pest-resumen" hidden>
       <section class="kpis" aria-label="Cifras clave">
         <div class="kpi kpi--ventas"><strong id="r-ventas">$0</strong><span>Ventas</span></div>
@@ -1468,7 +1694,7 @@ const VENDIDO = ['alistando', 'en_camino', 'entregado'];
 let panelOrders = [], picked = new Map(), store = null, panelAbierto = false;
 // Sesión del panel: quién entró y con qué rol. El servidor es quien manda; esto solo decide qué se muestra.
 let YO = null;
-function panelListo(ok) { panelAbierto = ok; $('panel').classList.toggle('bloqueado', !ok); if (ok) $('vivo-texto').textContent = 'En vivo'; }
+function panelListo(ok) { panelAbierto = ok; $('panel').classList.toggle('bloqueado', !ok); if (ok) $('vivo-texto').textContent = 'En vivo'; if (ok && !CONV.primeraCarga) { CONV.primeraCarga = true; cargarChats(); } }
 function pintarSesion() {
   const admin = !!YO && YO.rol === 'admin';
   $('quien').hidden = $('salir').hidden = !YO;
@@ -1654,13 +1880,407 @@ function renderPanel() {
 }
 $('limpiar').onclick = () => panelOrders.filter(o => o.status === 'entregado').forEach(o => store.remove(o.id).catch(() => {}));
 function verPestana(nombre) {
-  document.querySelectorAll('.pestanas button').forEach(x => x.setAttribute('aria-selected', String(x.dataset.pest === nombre)));
+  document.querySelectorAll('.pestanas button[data-pest]').forEach(x => x.setAttribute('aria-selected', String(x.dataset.pest === nombre)));
+  const boton = document.querySelector('.pestanas [data-pest="' + nombre + '"]');
+  if (boton) $('seccion-actual').textContent = nombrePestana(boton);
+  abrirMenu(false);
+  if (lenis) lenis.scrollTo(0, { immediate: true }); else scrollTo(0, 0);
+  if (nombre === 'conversaciones') { cargarChats(); if (CONV.abierto) cargarChat(true); else if (!$('wa-chat').childElementCount) pintarBienvenida(); }
   document.querySelectorAll('.vista[id^="pest-"]').forEach(v => { v.hidden = v.id !== 'pest-' + nombre; });
   if (nombre === 'usuarios') cargarUsuarios();
   if (nombre === 'ajustes') cargarAjustes();
   if (nombre === 'solicitados') cargarSolicitados();
   if (nombre === 'resumen') cargarOpiniones();
 }
+
+/* Menú del panel: barra lateral en computador, hamburguesa en celular */
+function abrirMenu(abrir) { $('panel').classList.toggle('menu-abierto', abrir); $('menu-boton').setAttribute('aria-expanded', String(abrir)); }
+$('menu-boton').onclick = () => abrirMenu(!$('panel').classList.contains('menu-abierto'));
+$('menu-fondo').onclick = () => abrirMenu(false);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') abrirMenu(false); });
+// La altura de la barra de arriba: el menú lateral y las conversaciones quedan justo debajo.
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => $('panel').style.setProperty('--alto-barra', $('panel').querySelector('.barra').offsetHeight + 'px')).observe($('panel').querySelector('.barra'));
+const nombrePestana = b => [...b.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
+
+/* Conversaciones: el WhatsApp del asistente dentro del panel */
+const ICO = {
+  check: '<svg viewBox="0 0 16 11" fill="currentColor"><path d="M11.1.3a.7.7 0 0 1 1 1l-6.6 7.4a.7.7 0 0 1-1 0L1.3 5.6a.7.7 0 1 1 1-1l2.6 2.6z"/></svg>',
+  doble: '<svg viewBox="0 0 16 11" fill="currentColor"><path d="M11.1.3a.7.7 0 0 1 1 1l-6.6 7.4a.7.7 0 0 1-1 0L1.3 5.6a.7.7 0 1 1 1-1l2.6 2.6z"/><path d="M15 .3a.7.7 0 0 1 1 1L9.4 8.7a.7.7 0 0 1-1 0l-.6-.6 1-1.1.1.1z"/></svg>',
+  reloj: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10.2-6.5a1 1 0 0 0 0-1.7L9.5 4.6A1 1 0 0 0 8 5.5z"/></svg>',
+  pausa: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1.2"/><rect x="13.5" y="5" width="4" height="14" rx="1.2"/></svg>',
+  mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  responder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 8L5 13l5 5"/><path d="M5 13h9a5 5 0 0 1 5 5v1"/></svg>',
+  cara: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/></svg>',
+  clip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg>',
+  enviar: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.5-7.5a1 1 0 0 0 0-1.8L3.4 3.6a1 1 0 0 0-1.4 1.1L3.8 11 14 12 3.8 13l-1.8 6.3a1 1 0 0 0 1.4 1.1z"/></svg>',
+  volver: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  abajo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19l1.4-4A8 8 0 1 1 9 18.6z"/><path d="M9 10h6M9 13.5h4"/></svg>',
+};
+function icono(nombre, clase, titulo) { const s = h('span', { class: clase || '' }); if (titulo) { s.title = titulo; s.setAttribute('aria-label', titulo); } s.innerHTML = ICO[nombre]; return s; }
+const CONV = { chats: [], abierto: null, ficha: null, mensajes: [], firmaLista: '', firmaChat: '', filtro: 'todos', respuesta: null, adjunto: null, emojis: false, ventana: 86400000, ultimoEscribiendo: 0, enviando: false, ui: null, vistos: null, vistosDe: null, tick: 0 };
+const CACHE_NODOS = new Map();
+const EMOJIS_REACCION = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+const EMOJIS = '😀 😂 😊 😍 🥰 😉 😎 🤗 🤔 😅 🙏 👍 👌 👏 🙌 💪 ✅ ❌ ⏰ 🛵 🛒 🧾 💵 💳 📍 🏠 🎉 ❤️ 🔥 ⭐ 🥤 🍺 🍞 🥛 🥚 🍌 🍎 🥩 🍫 🍪'.split(' ');
+const urlConv = (accion, extra = '') => '/api/whatsapp?accion=' + accion + extra;
+const urlMedio = id => urlConv('medio', '&id=' + encodeURIComponent(id));
+const esTel = t => /^\+?\d+$/.test(String(t));
+function telBonito(t) { const d = String(t).replace(/\D/g, ''); return d.length === 12 && d.startsWith('57') ? '+57 ' + d.slice(2, 5) + ' ' + d.slice(5, 8) + ' ' + d.slice(8) : '+' + d; }
+const nombreDe = f => (f && (f.nombre || (f.usuario ? '@' + f.usuario : esTel(f.id) ? telBonito(f.id) : 'Cliente de WhatsApp'))) || 'Cliente';
+function colorDe(texto) { let n = 0; for (const ch of String(texto)) n = (n * 31 + ch.charCodeAt(0)) >>> 0; return 'hsl(' + (n % 360) + ' 48% 44%)'; }
+function iniciales(nombre) { const p = String(nombre).replace(/^[@+]/, '').trim().split(/\s+/); return /^\d/.test(p[0] || '') ? '#' : ((p[0] || '?')[0] + (p[1] ? p[1][0] : '')).toUpperCase(); }
+function avatarDe(f, chico) { const a = h('span', { class: 'wa-avatar' + (chico ? ' wa-avatar--chico' : ''), 'aria-hidden': 'true' }, iniciales(nombreDe(f))); a.style.background = colorDe(f.id); return a; }
+const hhmm = ms => new Date(ms).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+function mismoDia(a, b) { return new Date(a).toDateString() === new Date(b).toDateString(); }
+function cuandoCorto(ms) { const ayer = Date.now() - 86400000; return mismoDia(ms, Date.now()) ? hhmm(ms) : mismoDia(ms, ayer) ? 'Ayer' : new Date(ms).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }); }
+function diaLargo(ms) { const ayer = Date.now() - 86400000; return mismoDia(ms, Date.now()) ? 'Hoy' : mismoDia(ms, ayer) ? 'Ayer' : new Date(ms).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' }); }
+const textoBreve = m => m.texto || ({ image: '📷 Foto', audio: '🎤 Nota de voz', video: '🎬 Video', document: '📄 Documento', sticker: 'Sticker', location: '📍 Ubicación', interactive: 'Opciones', boton: 'Botón' })[m.tipo] || 'Mensaje';
+const ventanaAbierta = () => Boolean(CONV.ficha && CONV.ficha.ultimoCliente && Date.now() - CONV.ficha.ultimoCliente < CONV.ventana);
+const minutosRestantes = s => s >= 3600 ? Math.floor(s / 3600) + ' h ' + Math.round((s % 3600) / 60) + ' min' : Math.max(1, Math.round(s / 60)) + ' min';
+function nodoCacheado(clave, crear) { if (!CACHE_NODOS.has(clave)) CACHE_NODOS.set(clave, crear()); return CACHE_NODOS.get(clave); }
+function abrirVisor(src, titulo) { $('visor-titulo').textContent = titulo; $('visor-img').src = src; $('visor-img').classList.remove('real'); $('visor').showModal(); }
+
+/* Lista de chats */
+function chatsFiltrados() {
+  const q = norm($('wa-buscar').value || '');
+  return CONV.chats.filter(f => (CONV.filtro !== 'noleidos' || f.noLeidos > 0) && (CONV.filtro !== 'tienda' || f.pausa > 0) && (!q || norm(nombreDe(f) + ' ' + f.id + ' ' + (f.usuario || '') + ' ' + (f.ultimo || '')).includes(q)));
+}
+function pintarChats() {
+  const total = CONV.chats.reduce((s, f) => s + (f.noLeidos || 0), 0);
+  $('t-convs').hidden = !total; $('t-convs').textContent = total;
+  const lista = chatsFiltrados();
+  if (!lista.length) { $('wa-chats').replaceChildren(h('div', { class: 'wa-vacio' }, icono('chat'), h('p', null, CONV.chats.length ? 'Ningún chat coincide con la búsqueda.' : 'Todavía no hay conversaciones. Cuando un cliente le escriba al WhatsApp del asistente, aparece aquí.'))); return; }
+  $('wa-chats').replaceChildren(...lista.map(f => {
+    const ultimo = h('span', { class: 'wa-chat-item__ultimo' });
+    if (f.ultimoDir === 'out') ultimo.append(icono('doble'));
+    ultimo.append(h('span', null, f.ultimo || ''));
+    const lado = h('span', { class: 'wa-chat-item__lado' }, h('span', null, f.hora ? cuandoCorto(f.hora) : ''), f.noLeidos ? h('b', null, String(f.noLeidos)) : f.pausa > 0 ? h('span', { class: 'wa-etiqueta' }, 'Tienda') : null);
+    const item = h('button', { type: 'button', class: 'wa-chat-item' + (f.noLeidos ? ' wa-chat-item--nuevo' : ''), 'aria-current': String(f.id === CONV.abierto) }, avatarDe(f), h('span', { class: 'wa-chat-item__centro' }, h('span', { class: 'wa-chat-item__nombre' }, nombreDe(f)), ultimo), lado);
+    item.setAttribute('role', 'listitem');
+    item.onclick = () => abrirChat(f.id);
+    return item;
+  }));
+}
+function cargarChats() {
+  return pedir(urlConv('chats')).then(d => {
+    CONV.chats = d.chats || []; CONV.ventana = d.ventana || CONV.ventana;
+    const firma = JSON.stringify(CONV.chats) + '|' + CONV.abierto + '|' + CONV.filtro;
+    if (firma !== CONV.firmaLista) { CONV.firmaLista = firma; pintarChats(); }
+    if (!CONV.abierto && !$('wa-chat').childElementCount) pintarBienvenida();
+  }).catch(() => {});
+}
+$('wa-buscar').addEventListener('input', pintarChats);
+document.querySelectorAll('.wa-filtros [data-filtro]').forEach(b => b.onclick = () => {
+  CONV.filtro = b.dataset.filtro;
+  document.querySelectorAll('.wa-filtros [data-filtro]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  pintarChats();
+});
+function pintarBienvenida() {
+  const leyenda = h('div', { class: 'wa-leyenda' }, ...[['#fff', 'Cliente'], ['#ece5ff', 'Asistente'], ['#d9fdd3', 'Tienda']].map(([color, nombre]) => { const i = h('i'); i.style.background = color; return h('span', null, i, nombre); }));
+  $('wa-chat').replaceChildren(h('div', { class: 'wa-bienvenida' }, h('div', null, h('div', { class: 'wa-bienvenida__arte' }, icono('chat')), h('h3', null, 'El WhatsApp de la tienda'), h('p', null, 'Elige un chat para ver lo que escribió el cliente y lo que le contestó el asistente. Si respondes desde aquí, el asistente se calla un rato en ese chat.'), leyenda)));
+}
+
+/* Chat abierto */
+function abrirChat(id) {
+  if (CONV.abierto !== id) { CACHE_NODOS.forEach(n => n.querySelector && n.querySelectorAll('audio, video').forEach(a => a.pause())); CACHE_NODOS.clear(); }
+  CONV.abierto = id; CONV.firmaChat = ''; CONV.respuesta = null; CONV.adjunto = null; CONV.emojis = false; CONV.mensajes = []; CONV.ficha = CONV.chats.find(f => f.id === id) || { id };
+  $('wa').classList.add('con-chat');
+  armarChat(); pintarCabeza();
+  cargarChat(true);
+  pedir(urlConv('leer'), { method: 'POST', body: JSON.stringify({ c: id }) }).then(cargarChats).catch(() => {});
+  pintarChats();
+}
+function cerrarChat() { CONV.abierto = null; CONV.ficha = null; $('wa').classList.remove('con-chat'); pintarBienvenida(); pintarChats(); }
+function armarChat() {
+  const ui = CONV.ui = {};
+  const volver = h('button', { class: 'wa-volver', type: 'button', 'aria-label': 'Volver a los chats' }, icono('volver'));
+  volver.onclick = cerrarChat;
+  ui.avatar = h('span'); ui.nombre = h('strong'); ui.sub = h('small'); ui.modo = h('div', { class: 'wa-modo' });
+  const cabeza = h('header', { class: 'wa-chat__cabeza' }, volver, ui.avatar, h('div', { class: 'wa-chat__quien' }, ui.nombre, ui.sub), ui.modo);
+  ui.mensajes = h('div', { class: 'wa-mensajes', 'data-lenis-prevent': '' });
+  ui.mensajes.setAttribute('role', 'log');
+  ui.bajar = h('button', { class: 'wa-bajar', type: 'button', 'aria-label': 'Ir al último mensaje' }, icono('abajo'));
+  ui.bajar.hidden = true;
+  ui.bajar.onclick = () => bajarAlFinal(true);
+  ui.mensajes.addEventListener('scroll', () => { ui.bajar.hidden = cercaDelFinal(); });
+  ui.mensajes.addEventListener('dragover', e => { if (ventanaAbierta()) e.preventDefault(); });
+  ui.mensajes.addEventListener('drop', e => { const f = [...(e.dataTransfer?.files || [])].find(x => x.type.startsWith('image/')); if (f && ventanaAbierta()) { e.preventDefault(); prepararFoto(f); } });
+  ui.extras = h('div'); ui.extras.style.display = 'none';
+  ui.texto = h('textarea', { rows: 1, placeholder: 'Escribe un mensaje', maxLength: 4000 });
+  ui.texto.setAttribute('aria-label', 'Mensaje para el cliente');
+  ui.archivo = h('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp' });
+  ui.archivo.hidden = true;
+  const clip = h('button', { class: 'wa-icono', type: 'button', 'aria-label': 'Adjuntar foto', title: 'Adjuntar foto' }, icono('clip'));
+  const cara = h('button', { class: 'wa-icono', type: 'button', 'aria-label': 'Emojis', title: 'Emojis' }, icono('cara'));
+  ui.enviar = h('button', { class: 'wa-enviar', type: 'button', 'aria-label': 'Enviar', title: 'Enviar' }, icono('enviar'));
+  ui.ventana = h('div', { class: 'wa-ventana' });
+  ui.error = h('div', { class: 'wa-error', role: 'alert' });
+  ui.fila = h('div', { class: 'wa-escribir__fila' }, cara, clip, ui.texto, ui.enviar, ui.archivo);
+  ui.cerrada = h('div', { class: 'wa-cerrada' }, '⏳', h('span', null, 'Pasaron más de 24 horas desde el último mensaje del cliente. WhatsApp no deja escribirle libremente hasta que vuelva a escribir.'));
+  ui.cerrada.hidden = true;
+  $('wa-chat').replaceChildren(cabeza, ui.mensajes, ui.bajar, h('footer', { class: 'wa-escribir' }, ui.extras, ui.cerrada, ui.fila, ui.ventana, ui.error));
+  clip.onclick = () => ui.archivo.click();
+  ui.archivo.onchange = () => { const f = ui.archivo.files[0]; ui.archivo.value = ''; if (f) prepararFoto(f); };
+  cara.onclick = () => { CONV.emojis = !CONV.emojis; pintarExtras(); };
+  ui.texto.addEventListener('input', () => { ajustarAlto(); avisarEscribiendo(); });
+  ui.texto.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviarMensaje(); } });
+  ui.texto.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])].find(x => x.type.startsWith('image/')); if (f) { e.preventDefault(); prepararFoto(f); } });
+  ui.enviar.onclick = enviarMensaje;
+}
+function cargarChat(forzar) {
+  const id = CONV.abierto;
+  if (!id) return Promise.resolve();
+  return pedir(urlConv('chat', '&c=' + encodeURIComponent(id))).then(d => {
+    if (CONV.abierto !== id || !CONV.ui) return;
+    CONV.ventana = d.ventana || CONV.ventana;
+    const firma = JSON.stringify(d.mensajes) + '|' + JSON.stringify(d.ficha);
+    CONV.ficha = d.ficha;
+    if (!forzar && firma === CONV.firmaChat) { pintarCabeza(); pintarVentana(); return; }
+    const nuevos = (d.mensajes || []).length - CONV.mensajes.length;
+    const abajo = forzar || cercaDelFinal();
+    CONV.firmaChat = firma; CONV.mensajes = d.mensajes || [];
+    pintarCabeza(); pintarMensajes(); pintarVentana();
+    if (abajo) {
+      bajarAlFinal(!forzar);
+      // Las fotos terminan de cargar después y empujan el chat: se vuelve a bajar cuando cargan.
+      CONV.ui.mensajes.querySelectorAll('img').forEach(i => { if (!i.complete) i.addEventListener('load', () => { if (cercaDelFinal() || forzar) bajarAlFinal(false); }, { once: true }); });
+    } else if (nuevos > 0) CONV.ui.bajar.hidden = false;
+    if (!forzar && nuevos > 0 && CONV.mensajes.at(-1)?.dir === 'in' && document.visibilityState === 'visible') pedir(urlConv('leer'), { method: 'POST', body: JSON.stringify({ c: id }) }).catch(() => {});
+  }).catch(e => { if (CONV.ui) CONV.ui.error.textContent = e.message; });
+}
+const cercaDelFinal = () => { const m = CONV.ui?.mensajes; return !m || m.scrollHeight - m.scrollTop - m.clientHeight < 120; };
+function bajarAlFinal(suave) { const m = CONV.ui.mensajes; m.scrollTo({ top: m.scrollHeight, behavior: suave && !sinMovimiento ? 'smooth' : 'auto' }); CONV.ui.bajar.hidden = true; }
+function pintarCabeza() {
+  const f = CONV.ficha, ui = CONV.ui;
+  if (!f || !ui) return;
+  ui.avatar.replaceChildren(avatarDe(f, true));
+  ui.nombre.textContent = nombreDe(f);
+  ui.sub.textContent = [f.usuario && f.nombre ? '@' + f.usuario : '', esTel(f.id) ? telBonito(f.id) : '', f.ultimoCliente ? 'último mensaje ' + (mismoDia(f.ultimoCliente, Date.now()) ? 'a las ' : '') + cuandoCorto(f.ultimoCliente).toLowerCase() : ''].filter(Boolean).join(' · ');
+  if (f.pausa > 0) {
+    const devolver = h('button', { class: 'wa-accion wa-accion--suave', type: 'button', title: 'El asistente vuelve a contestar en este chat' }, 'Devolver al asistente');
+    devolver.onclick = () => accionChat('soltar');
+    ui.modo.replaceChildren(h('span', { class: 'wa-chip wa-chip--tienda' }, '👤 Atiende la tienda · ' + minutosRestantes(f.pausa)), devolver);
+  } else {
+    const tomar = h('button', { class: 'wa-accion', type: 'button', title: 'El asistente deja de contestar en este chat por 2 horas' }, 'Tomar chat');
+    tomar.onclick = () => accionChat('tomar', { horas: 2 });
+    ui.modo.replaceChildren(h('span', { class: 'wa-chip wa-chip--bot' }, 'Responde el asistente'), tomar);
+  }
+}
+function pintarVentana() {
+  const ui = CONV.ui;
+  if (!CONV.ficha || !ui) return;
+  const resta = CONV.ficha.ultimoCliente ? CONV.ficha.ultimoCliente + CONV.ventana - Date.now() : -1;
+  const abierta = resta > 0;
+  ui.cerrada.hidden = abierta; ui.fila.hidden = !abierta;
+  if (!abierta && (CONV.emojis || CONV.respuesta || CONV.adjunto)) { CONV.emojis = false; CONV.respuesta = null; CONV.adjunto = null; pintarExtras(); }
+  ui.ventana.replaceChildren(...(abierta ? [h('span', null, 'Puedes responder ' + (resta >= 3600000 ? Math.floor(resta / 3600000) + ' h más' : Math.max(1, Math.round(resta / 60000)) + ' min más')), h('span', null, 'Enter envía · Shift + Enter, nueva línea')] : []));
+}
+function accionChat(accion, extra = {}) {
+  return pedir(urlConv(accion), { method: 'POST', body: JSON.stringify({ c: CONV.abierto, ...extra }) }).then(() => { cargarChat(); cargarChats(); }).catch(e => { if (CONV.ui) CONV.ui.error.textContent = e.message; });
+}
+
+/* Burbujas */
+function pintarMensajes() {
+  const ui = CONV.ui, porId = new Map(CONV.mensajes.map(m => [m.id, m]));
+  const primera = CONV.vistosDe !== CONV.abierto;
+  if (primera) { CONV.vistos = new Set(); CONV.vistosDe = CONV.abierto; }
+  const nodos = [];
+  let dia = '', anterior = null;
+  for (const m of CONV.mensajes) {
+    const d = new Date(m.hora).toDateString();
+    if (d !== dia) { dia = d; nodos.push(h('div', { class: 'wa-dia' }, diaLargo(m.hora))); anterior = null; }
+    const grupo = !anterior || anterior.dir !== m.dir || anterior.de !== m.de || m.hora - anterior.hora > 5 * 60000;
+    nodos.push(burbuja(m, porId, grupo, !primera && !CONV.vistos.has(m.id)));
+    CONV.vistos.add(m.id);
+    anterior = m;
+  }
+  if (!CONV.mensajes.length) nodos.push(h('div', { class: 'wa-aviso' }, 'Todavía no hay mensajes en este chat.'));
+  ui.mensajes.replaceChildren(...nodos);
+}
+function marca(estado) {
+  const [e, motivo] = String(estado || '').split('|');
+  if (e === 'failed') { const s = h('span', { class: 'fallo' }, '⚠'); s.title = 'No se entregó' + (motivo ? ': ' + motivo : ''); return s; }
+  if (e === 'read') return icono('doble', 'leido', 'Leído');
+  if (e === 'delivered') return icono('doble', '', 'Entregado');
+  if (e === 'sent') return icono('check', '', 'Enviado');
+  return icono('reloj', '', 'Enviando');
+}
+function autorDe(m) { return m.dir === 'in' ? nombreDe(CONV.ficha) : m.de === 'tienda' ? (m.por || 'La tienda') : 'El asistente'; }
+function burbuja(m, porId, grupo, animar) {
+  const real = m.id && !String(m.id).startsWith('local-');
+  const caja = h('div', { class: 'wa-burbuja' });
+  if (m.dir === 'out' && grupo) caja.append(h('div', { class: 'wa-autor ' + (m.de === 'tienda' ? 'wa-autor--tienda' : 'wa-autor--bot') }, m.de === 'tienda' ? '👤 ' + (m.por || 'Tienda') : '🤖 Asistente'));
+  if (m.contexto) {
+    const c = porId.get(m.contexto);
+    const cita = h('div', { class: 'wa-cita' }, h('b', null, c ? autorDe(c) : 'Mensaje'), h('span', null, c ? textoBreve(c) : 'Mensaje anterior'));
+    if (c) cita.onclick = () => resaltar(c.id);
+    caja.append(cita);
+  }
+  caja.append(...contenido(m));
+  const pie = h('span', { class: 'wa-pie' }, hhmm(m.hora));
+  if (m.dir === 'out') pie.append(marca(m.estado));
+  caja.append(pie);
+  const nodo = h('div', { class: 'wa-msg ' + m.dir + (m.dir === 'out' && m.de !== 'tienda' ? ' asistente' : '') + (grupo ? ' wa-msg--nuevo-grupo' : '') + (animar ? ' wa-msg--anim' : '') }, caja);
+  nodo.dataset.id = m.id || '';
+  if (m.tipo === 'interactive' && m.botones && m.botones.length) nodo.append(h('div', { class: 'wa-botones' }, ...m.botones.map(b => h('span', null, b))));
+  const reacciones = [m.reaccionCliente, m.reaccionTienda].filter(Boolean);
+  if (reacciones.length) { nodo.classList.add('wa-msg--con-reaccion'); nodo.append(h('div', { class: 'wa-reacciones', title: 'Reacciones' }, ...reacciones)); }
+  if (real && ventanaAbierta()) nodo.append(herramientas(m, nodo));
+  nodo.addEventListener('click', e => { if (matchMedia('(max-width: 900px)').matches && !e.target.closest('button, a, audio, video, details')) nodo.classList.toggle('mostrar-herramientas'); });
+  return nodo;
+}
+function contenido(m) {
+  const partes = [], medio = m.medio || {};
+  const src = medio.id ? urlMedio(medio.id) : medio.enlace || '';
+  if (m.tipo === 'image' && src) partes.push(nodoCacheado('img:' + (medio.id || medio.enlace), () => { const b = h('button', { class: 'wa-foto', type: 'button', 'aria-label': 'Ver la foto en grande' }, h('img', { src, alt: m.texto || 'Foto del chat', loading: 'lazy' })); b.onclick = () => abrirVisor(src, m.texto || 'Foto del chat'); return b; }));
+  else if (m.tipo === 'sticker' && src) partes.push(h('img', { class: 'wa-sticker', src, alt: 'Sticker', loading: 'lazy' }));
+  else if (m.tipo === 'audio' && src) partes.push(nodoCacheado('audio:' + medio.id, () => reproductor(src, m)));
+  else if (m.tipo === 'video' && src) partes.push(nodoCacheado('video:' + medio.id, () => h('video', { class: 'wa-video', src, controls: true, preload: 'metadata' })));
+  else if (m.tipo === 'document' && src) partes.push(h('a', { class: 'wa-doc', href: src, target: '_blank', rel: 'noopener', download: medio.nombre || 'documento' }, h('b', null, '📄'), h('span', null, medio.nombre || 'Documento')));
+  else if (m.tipo === 'location' && m.ubicacion) { const u = m.ubicacion; partes.push(h('a', { class: 'wa-mapa', href: 'https://www.google.com/maps?q=' + Number(u.lat) + ',' + Number(u.lng), target: '_blank', rel: 'noopener' }, h('span', { class: 'wa-mapa__img' }, '📍'), h('span', null, u.nombre || 'Ubicación compartida'))); }
+  if (m.tipo === 'boton') partes.push(h('span', { class: 'wa-boton-tocado wa-texto' }, m.texto));
+  else if (m.texto && m.tipo !== 'audio') partes.push(h('span', { class: 'wa-texto' }, m.texto));
+  if (m.tipo === 'audio' && m.transcripcion) partes.push(nodoCacheado('tr:' + m.id, () => h('details', { class: 'wa-transcripcion' }, h('summary', null, 'Ver lo que dijo'), h('div', null, m.transcripcion))));
+  if (!partes.length) partes.push(h('span', { class: 'wa-texto' }, textoBreve(m)));
+  return partes;
+}
+let audioSonando = null;
+function reproductor(src, m) {
+  const audio = new Audio();
+  audio.preload = 'metadata'; audio.src = src;
+  const n = 38, barras = [];
+  let semilla = 7;
+  for (const ch of String(m.id)) semilla = (semilla * 33 + ch.charCodeAt(0)) >>> 0;
+  const fila = h('div', { class: 'wa-barras', tabIndex: 0, 'aria-label': 'Posición de la nota de voz', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': '0' });
+  fila.setAttribute('role', 'slider');
+  for (let i = 0; i < n; i++) {
+    semilla = (Math.imul(semilla, 1103515245) + 12345) >>> 0;
+    const alto = 20 + (semilla % 80) * Math.pow(Math.sin(((i + 1) / (n + 1)) * Math.PI), 0.5);
+    const b = h('span'); b.style.height = Math.max(14, Math.min(100, alto)) + '%';
+    barras.push(b); fila.append(b);
+  }
+  const boton = h('button', { class: 'wa-play', type: 'button', 'aria-label': 'Reproducir nota de voz' }, icono('play'));
+  const tiempo = h('span', null, '0:00');
+  const vel = h('button', { class: 'wa-velocidad', type: 'button', title: 'Velocidad de reproducción' }, '1×');
+  const foto = h('span', { class: 'wa-voz__foto' }, icono('mic'), m.medio && m.medio.voz ? h('i', null, '●') : null);
+  const fmt = s => !isFinite(s) || !s ? '0:00' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+  const pintar = () => {
+    const p = audio.duration && isFinite(audio.duration) ? audio.currentTime / audio.duration : 0, k = Math.round(p * n);
+    barras.forEach((b, i) => b.classList.toggle('ya', i < k));
+    fila.setAttribute('aria-valuenow', String(Math.round(p * 100)));
+    tiempo.textContent = fmt(audio.currentTime > 0 ? audio.currentTime : audio.duration);
+  };
+  audio.addEventListener('loadedmetadata', pintar);
+  audio.addEventListener('timeupdate', pintar);
+  audio.addEventListener('play', () => { if (audioSonando && audioSonando !== audio) audioSonando.pause(); audioSonando = audio; boton.replaceChildren(icono('pausa')); boton.setAttribute('aria-label', 'Pausar'); });
+  audio.addEventListener('pause', () => { boton.replaceChildren(icono('play')); boton.setAttribute('aria-label', 'Reproducir nota de voz'); });
+  audio.addEventListener('ended', () => { audio.currentTime = 0; pintar(); });
+  audio.addEventListener('error', () => { tiempo.textContent = 'No se pudo cargar'; });
+  boton.onclick = e => { e.stopPropagation(); if (audio.paused) audio.play().catch(() => { tiempo.textContent = 'No se pudo reproducir'; }); else audio.pause(); };
+  const saltar = x => { if (audio.duration && isFinite(audio.duration)) { audio.currentTime = Math.max(0, Math.min(1, x)) * audio.duration; pintar(); } };
+  fila.onclick = e => { e.stopPropagation(); const r = fila.getBoundingClientRect(); saltar((e.clientX - r.left) / r.width); };
+  fila.onkeydown = e => { if (!audio.duration) return; if (e.key === 'ArrowRight') saltar(audio.currentTime / audio.duration + 0.05); if (e.key === 'ArrowLeft') saltar(audio.currentTime / audio.duration - 0.05); if (e.key === ' ') { e.preventDefault(); boton.click(); } };
+  const velocidades = [1, 1.5, 2];
+  vel.onclick = e => { e.stopPropagation(); const i = (velocidades.indexOf(audio.playbackRate) + 1) % velocidades.length; audio.playbackRate = velocidades[i]; vel.textContent = velocidades[i] + '×'; };
+  return h('div', { class: 'wa-voz' }, foto, boton, h('div', { class: 'wa-onda' }, fila, h('div', { class: 'wa-onda__pie' }, tiempo, vel)));
+}
+function herramientas(m, nodo) {
+  const responder = h('button', { type: 'button', 'aria-label': 'Responder a este mensaje', title: 'Responder' }, icono('responder'));
+  responder.onclick = e => { e.stopPropagation(); CONV.respuesta = m; pintarExtras(); CONV.ui.texto.focus(); };
+  const reaccionar = h('button', { type: 'button', 'aria-label': 'Reaccionar', title: 'Reaccionar' }, icono('cara'));
+  reaccionar.onclick = e => {
+    e.stopPropagation();
+    const ya = nodo.querySelector('.wa-selector');
+    document.querySelectorAll('.wa-selector').forEach(s => s.remove());
+    if (ya) return;
+    const sel = h('div', { class: 'wa-selector' }, ...EMOJIS_REACCION.map(em => {
+      const b = h('button', { type: 'button', 'aria-label': 'Reaccionar con ' + em }, em);
+      b.onclick = ev => { ev.stopPropagation(); sel.remove(); accionChat('reaccion', { id: m.id, emoji: m.reaccionTienda === em ? '' : em }); };
+      return b;
+    }));
+    nodo.append(sel);
+  };
+  return h('div', { class: 'wa-herramientas' }, responder, reaccionar);
+}
+document.addEventListener('click', e => { if (!e.target.closest('.wa-selector')) document.querySelectorAll('.wa-selector').forEach(s => s.remove()); });
+function resaltar(id) {
+  const n = [...CONV.ui.mensajes.querySelectorAll('.wa-msg')].find(x => x.dataset.id === id);
+  if (!n) return;
+  n.scrollIntoView({ behavior: sinMovimiento ? 'auto' : 'smooth', block: 'center' });
+  if (n.animate) n.animate([{ filter: 'brightness(0.82)' }, { filter: 'none' }], { duration: 1400 });
+}
+
+/* Escribir: texto, emojis, foto, responder a un mensaje */
+function pintarExtras() {
+  const ui = CONV.ui;
+  if (!ui) return;
+  const partes = [];
+  if (CONV.respuesta) {
+    const r = CONV.respuesta, quitar = h('button', { class: 'wa-quitar', type: 'button', 'aria-label': 'Cancelar la respuesta' }, '×');
+    quitar.onclick = () => { CONV.respuesta = null; pintarExtras(); };
+    partes.push(h('div', { class: 'wa-responder' }, h('div', null, h('b', null, 'Respondiendo a ' + autorDe(r)), h('span', null, textoBreve(r))), quitar));
+  }
+  if (CONV.adjunto) {
+    const quitar = h('button', { class: 'wa-quitar', type: 'button', 'aria-label': 'Quitar la foto' }, '×');
+    quitar.onclick = () => { CONV.adjunto = null; pintarExtras(); };
+    partes.push(h('div', { class: 'wa-adjunto' }, h('img', { src: CONV.adjunto.vista, alt: 'Foto para enviar' }), h('div', null, h('b', null, 'Foto lista para enviar'), h('span', null, ' · lo que escribas va al pie de la foto')), quitar));
+  }
+  if (CONV.emojis) partes.push(h('div', { class: 'wa-emojis' }, ...EMOJIS.map(em => { const b = h('button', { type: 'button', 'aria-label': em }, em); b.onclick = () => insertarEnTexto(em); return b; })));
+  ui.extras.replaceChildren(...partes);
+  ui.extras.style.display = partes.length ? 'grid' : 'none';
+  ui.extras.style.gap = '0.4rem';
+}
+function insertarEnTexto(t) {
+  const ta = CONV.ui.texto, i = ta.selectionStart ?? ta.value.length, j = ta.selectionEnd ?? i;
+  ta.value = ta.value.slice(0, i) + t + ta.value.slice(j);
+  ta.focus(); ta.selectionStart = ta.selectionEnd = i + t.length; ajustarAlto();
+}
+function ajustarAlto() { const ta = CONV.ui.texto; ta.style.height = 'auto'; ta.style.height = Math.min(140, ta.scrollHeight) + 'px'; }
+function avisarEscribiendo() {
+  if (!CONV.abierto || Date.now() - CONV.ultimoEscribiendo < 20000) return;
+  CONV.ultimoEscribiendo = Date.now();
+  pedir(urlConv('escribiendo'), { method: 'POST', body: JSON.stringify({ c: CONV.abierto }) }).catch(() => {});
+}
+// La foto se achica en el navegador (máximo 1600 px, JPG) antes de subirla.
+function prepararFoto(archivo) {
+  if (!/^image\/(jpeg|png|webp)$/.test(archivo.type)) { CONV.ui.error.textContent = 'Solo se pueden enviar fotos JPG, PNG o WEBP.'; return; }
+  const url = URL.createObjectURL(archivo), img = new Image();
+  img.onload = () => {
+    const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+    const vista = c.toDataURL('image/jpeg', 0.82);
+    URL.revokeObjectURL(url);
+    CONV.adjunto = { vista, base64: vista.split(',')[1], tipo: 'image/jpeg' };
+    CONV.ui.error.textContent = ''; pintarExtras(); CONV.ui.texto.focus();
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); CONV.ui.error.textContent = 'No se pudo leer la foto.'; };
+  img.src = url;
+}
+async function enviarMensaje() {
+  const ui = CONV.ui;
+  if (!ui || CONV.enviando || !CONV.abierto) return;
+  const texto = ui.texto.value.trim();
+  if (!texto && !CONV.adjunto) return;
+  CONV.enviando = true; ui.enviar.disabled = true; ui.error.textContent = '';
+  const contexto = CONV.respuesta ? CONV.respuesta.id : undefined;
+  const cuerpo = CONV.adjunto ? { c: CONV.abierto, tipo: CONV.adjunto.tipo, base64: CONV.adjunto.base64, pie: texto, contexto } : { c: CONV.abierto, texto, contexto };
+  try {
+    await pedir(urlConv(CONV.adjunto ? 'imagen' : 'enviar'), { method: 'POST', body: JSON.stringify(cuerpo) });
+    ui.texto.value = ''; ajustarAlto(); CONV.adjunto = null; CONV.respuesta = null; CONV.emojis = false; pintarExtras();
+    await cargarChat(); bajarAlFinal(true); cargarChats();
+  } catch (e) { ui.error.textContent = e.message; }
+  finally { CONV.enviando = false; ui.enviar.disabled = false; ui.texto.focus(); }
+}
+// Se refresca solo: la lista cada ~10 s en cualquier sección (para el contador) y el chat abierto cada 3,5 s.
+setInterval(() => {
+  if (vistaActual !== 'panel' || !panelAbierto || document.visibilityState !== 'visible') return;
+  const enConv = !$('pest-conversaciones').hidden;
+  CONV.tick++;
+  if (enConv || CONV.tick % 3 === 0) cargarChats();
+  if (enConv && CONV.abierto) cargarChat();
+}, 3500);
 
 /* Opiniones: lo que respondieron los clientes al entregarles el pedido */
 function cargarOpiniones() {
@@ -1689,7 +2309,7 @@ function cargarSolicitados() {
     }) : [h('tr', null, h('td', { colSpan: 5, class: 'vacio' }, 'Todavía nadie ha pedido algo que no esté en el catálogo.'))]));
   }).catch(e => { $('sol-estado').textContent = e.message; });
 }
-document.querySelectorAll('.pestanas button').forEach(b => b.onclick = () => verPestana(b.dataset.pest));
+document.querySelectorAll('.pestanas button[data-pest]').forEach(b => b.onclick = () => verPestana(b.dataset.pest));
 
 /* Usuarios del panel: solo para administradores */
 const ROL = { admin: 'Administrador', operativo: 'Operativo' };

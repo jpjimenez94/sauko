@@ -56,7 +56,7 @@ createServer(async (req, res) => {
     req.body = ["POST", "PATCH"].includes(req.method) ? await leerCuerpo(req) : {};
     res.status = (codigo) => ((res.statusCode = codigo), res);
     res.json = (objeto) => (res.setHeader("Content-Type", TIPOS[".json"]), res.end(JSON.stringify(objeto)));
-    res.send = (texto) => res.end(String(texto ?? ""));
+    res.send = (texto) => res.end(Buffer.isBuffer(texto) ? texto : String(texto ?? "")); // archivos del chat: bytes tal cual
     const { default: handler } = await rutas[url.pathname]();
     return handler(req, res);
   }
