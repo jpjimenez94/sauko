@@ -494,7 +494,7 @@ input { font: inherit; color: inherit; }
       </div>
       <div class="local__lista">
         <article class="fila"><div><h3>Local 23</h3><small>Hacienda Kachipay</small></div><p>Cl 60A #119C-84, Villa Fátima, Cali</p><p id="local-horario">Domicilios de 9 a.m. a 10 p.m.</p><button class="btn btn--dark" type="button" data-abrir-chat>Pedir aquí</button></article>
-        <article class="fila"><div><h3>Teléfono</h3><small>Pedidos y domicilios</small></div><p>312 452 9879</p><p>Contraentrega o transferencia</p><a class="btn btn--dark" href="tel:+573124529879">Llamar</a></article>
+        <article class="fila"><div><h3>WhatsApp</h3><small>Pedidos y domicilios</small></div><p>312 452 9879</p><p>Contraentrega o transferencia</p><a class="btn btn--dark" href="https://wa.me/573124529879">Escribir</a></article>
         <article class="fila"><div><h3>Instagram</h3><small>Novedades y antojos</small></div><p>@sauko.store</p><p>Productos de temporada</p><a class="btn btn--dark" href="https://www.instagram.com/sauko.store/">Ver perfil</a></article>
       </div>
     </section>
@@ -1346,7 +1346,7 @@ const ERR = { rate_limited: 'Hay muchas solicitudes seguidas. Espera un momento 
   image_rejected: 'No se pudo leer esa imagen. Prueba con otra foto (JPG o PNG).', refused: 'El asistente no pudo responder ese mensaje. Escríbelo de otra forma.',
   empty_completion: 'El asistente no respondió. Envía el mensaje otra vez.', upstream_error: 'Se cortó la conexión. Envía el mensaje otra vez.' };
 const GONE = ['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed', 'tools_unavailable'];
-const SIN_AGENTE = 'El asistente no está disponible en este momento. Puedes seguir armando el pedido con los botones o llamarnos al 312 452 9879.';
+const SIN_AGENTE = 'El asistente no está disponible en este momento. Puedes seguir armando el pedido con los botones o escribirnos al WhatsApp 312 452 9879.';
 
 // Conversa con /api/chat: el servidor devuelve los bloques de Claude y aquí se ejecutan las herramientas.
 async function sampleApi(turnos, opts) {
@@ -1398,9 +1398,7 @@ function agentGone() { sample = null; if (!mensajes.querySelector('.msg--error')
 // En celular el pedido se hace por el WhatsApp de la tienda: se abre con el mensaje ya escrito,
 // incluyendo lo que el cliente haya agregado con los botones.
 const WHATSAPP_TIENDA = '573124529879';
-// false mientras el WhatsApp de la tienda esté suspendido: todos piden por el chat de la página.
-const WHATSAPP_DISPONIBLE = false;
-const esCelular = () => WHATSAPP_DISPONIBLE && /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
+const esCelular = () => /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
 function mensajeParaWhatsApp(mensaje) {
   const lineas = CLOSED.includes(order.status) ? [] : order.items.map(i => i.qty + ' x ' + BY_SKU.get(i.sku).name);
   return lineas.length ? 'Hola, quiero pedir:\n' + lineas.join('\n') : (mensaje || 'Hola, quiero hacer un pedido');
@@ -1449,7 +1447,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarChat()
 let mensajePendiente, eligioChat = false;
 function pedirDomi(mensaje) {
   if (esCelular()) return abrirWhatsApp(mensaje);
-  if (!WHATSAPP_DISPONIBLE || eligioChat || turns.length || chat.classList.contains('is-abierto')) return abrirChat(mensaje);
+  if (eligioChat || turns.length || chat.classList.contains('is-abierto')) return abrirChat(mensaje);
   mensajePendiente = mensaje;
   $('elegir').showModal();
 }
