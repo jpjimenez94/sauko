@@ -1,0 +1,101 @@
+// Flujo completo del domiciliario con WhatsApp simulado y sin modelo de IA.
+// Las pruebas nunca tocan bases ni servicios reales: se borran las variables antes de importar el proyecto.
+for (const k of Object.keys(process.env)) if (/^(KV_|UPSTASH_|DATABASE_URL|POSTGRES|PG[A-Z]|YCLOUD_|ANTHROPIC|GROQ|WHATSAPP_)/.test(k)) delete process.env[k];
+import { pathToFileURL } from "node:url";
+const raiz = pathToFileURL(process.cwd() + "/").href;
+process.env.YCLOUD_API_KEY = "prueba";
+process.env.YCLOUD_FROM = "573000000000";
+process.env.ANTHROPIC_API_KEY = "prueba";
+const enviados = [];
+let llamadasIA = 0;
+const FOTO = Buffer.from("foto-de-la-entrega").toString("base64");
+globalThis.fetch = async (url, o) => {
+  const u = String(url);
+  if (u.includes("ycloud.com")) {
+    const b = JSON.parse(o.body);
+    enviados.push({ a: b.to || b.recipient, texto: b.text?.body ?? b.interactive?.body?.text ?? "(" + b.type + ")" });
+    return new Response("{}", { status: 200 });
+  }
+  llamadasIA++;
+  return new Response(JSON.stringify({ id: "m", type: "message", role: "assistant", model: "claude-haiku-5-5", content: [{ type: "text", text: "Listo, veci." }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200, headers: { "content-type": "application/json" } });
+};
+const store = await import(raiz + "lib/store.js");
+const { atenderEntrante } = await import(raiz + "lib/entrada.js");
+const pedidos = (await import(raiz + "api/orders.js")).default;
+const { crear } = await import(raiz + "lib/usuarios.js");
+const ok = (n, c) => console.log((c ? "OK    " : "FALLA ") + n);
+const DOMI = "573152213872", CLIENTE = "573009998877";
+const ultimoA = (tel) => enviados.filter((e) => e.a === tel).at(-1)?.texto ?? "";
+
+// El panel actúa con sesión: se arma una cookie de un admin de prueba.
+const { usuario } = await crear({ usuario: "dueno", nombre: "D", rol: "admin", clave: "clave-de-prueba-1" });
+const registro = (await store.leerUsuarios())[usuario.usuario];
+let cookie = "";
+await (await import(raiz + "lib/usuarios.js")).abrirSesion({ setHeader: (k, v) => { cookie = String(v).split(";")[0]; } }, registro);
+const llamar = (body) => new Promise((resolve) => pedidos({ method: "PATCH", headers: { cookie }, query: {}, body }, { status(c) { this.c = c; return this; }, json(d) { resolve([this.c, d]); }, setHeader() {} }));
+
+await store.guardarAjustes({ whatsappActivo: true, domiciliarios: [{ id: "d1", nombre: "Juan Pablo", telefono: DOMI, activo: true }] });
+let n = 0;
+const escribe = (tel, tipo, texto = "") => atenderEntrante({ id: "w" + ++n, telefono: tel, tipo, texto, bajar: async () => ({ mediaType: "image/jpeg", base64: FOTO }) });
+
+// Pedido en alistamiento: se le asigna código.
+const pedido = { id: "pdomi00000001", no: 2050, canal: "WhatsApp", cliente: CLIENTE, status: "alistando", pago: "Contraentrega", pagaCon: 20000, direccion: "Manzano torre 2 apto 208", items: [{ sku: "7702004003508", name: "Cerveza Club Colombia Lata 330 Cc", price: 4200, qty: 2 }], total: 10400, hora: Date.now() };
+await store.guardarPedido(pedido);
+const codigo = (await store.leerPedido(pedido.id)).codigo;
+ok("al alistar recibe un código de 4 números: " + codigo, /^\d{4}$/.test(codigo));
+
+// Despacha sin que el domiciliario haya iniciado turno.
+await llamar({ id: pedido.id, cambios: { status: "en_camino" } });
+let p = await store.leerPedido(pedido.id);
+ok("sin turno: queda asignado pero el aviso no sale", p.domiciliario?.nombre === "Juan Pablo" && p.avisoDomiciliario === "sin turno" && !enviados.some((e) => e.a === DOMI));
+
+// Inicia turno.
+await escribe(DOMI, "text", "inicio turno");
+ok("al iniciar turno le llega el pedido que se despachó antes", enviados.filter((e) => e.a === DOMI).some((e) => e.texto.startsWith("*" + codigo + " · Manzano T2-208")) && (await store.leerPedido(pedido.id)).avisoDomiciliario === "enviado");
+ok("inicio de turno: se le confirma y no pasa por el asistente", /Turno iniciado, Juan Pablo/.test(ultimoA(DOMI)) && llamadasIA === 0 && (await store.turnoDe("d1")) === DOMI);
+
+// Otro pedido, ya con turno: le llega el mensaje.
+const otro = { ...pedido, id: "pdomi00000002", no: 2051, pago: "Transferencia", pagaCon: 0, direccion: "Conjunto Sauko, Torre 4, Apto 901", items: [{ sku: "1", name: "Gaseosa Coca Cola 3 Lt Pet", price: 12000, qty: 1 }], total: 14000, codigo: undefined };
+await store.guardarPedido(otro);
+await llamar({ id: otro.id, cambios: { status: "en_camino" } });
+const msj = ultimoA(DOMI);
+p = await store.leerPedido(otro.id);
+console.log("\n--- Mensaje al domiciliario ---\n" + msj + "\n-------------------------------");
+ok("con turno: le llega el pedido con título, sin número de pedido y sin cobrar (transferencia)", p.avisoDomiciliario === "enviado" && msj.startsWith(`*${p.codigo} · Sauko T4-901 · 1 Coca Cola 3 Lt`) && !/#2051/.test(msj) && /no cobrar nada/.test(msj));
+
+// Código equivocado.
+await escribe(DOMI, "text", "0000");
+ok("código equivocado: se le dice", /no corresponde/.test(ultimoA(DOMI)));
+
+// Código bien, sin foto: se le pide la foto.
+await escribe(DOMI, "text", p.codigo);
+ok("código sin foto: se le pide la foto", /mandá la foto/.test(ultimoA(DOMI)));
+await escribe(DOMI, "image", "");
+p = await store.leerPedido(otro.id);
+ok("foto después del código: entregado, con foto y quién entregó", p.status === "entregado" && p.entregadoPor === "Juan Pablo" && p.fotoEntrega.startsWith("data:image/jpeg"));
+ok("al domiciliario le confirma con el título", ultimoA(DOMI).startsWith("✅ Entregado: " + p.codigo));
+ok("al cliente le llega el aviso de entregado", /entregado/i.test(ultimoA(CLIENTE)));
+
+// El primer pedido: le llega cuando despacha de nuevo? No: ya estaba en camino. Entrega con foto y código en el mismo mensaje.
+const primero = await store.leerPedido(pedido.id);
+await escribe(DOMI, "image", "listo " + primero.codigo);
+p = await store.leerPedido(pedido.id);
+ok("foto con el código escrito: entregado, efectivo pendiente de caja", p.status === "entregado" && p.efectivoPorEntregar === 10400 && /llevar \$10\.400 a la caja/.test(ultimoA(DOMI)));
+
+// El efectivo se marca recibido en caja.
+await llamar({ id: pedido.id, cambios: { efectivoEnCaja: true } });
+ok("recibido en caja: ya no queda pendiente", (await store.leerPedido(pedido.id)).efectivoPorEntregar === 0);
+
+// Foto sin código ni pendiente.
+await escribe(DOMI, "image", "");
+ok("foto suelta: se le dice que no tiene pedidos en camino", /no tenés pedidos en camino/.test(ultimoA(DOMI)));
+
+// Mensaje repetido por el proveedor: no repite la entrega.
+const antes = enviados.length;
+await atenderEntrante({ id: "w" + n, telefono: DOMI, tipo: "text", texto: "inicio turno" });
+ok("un mensaje repetido no se procesa dos veces", enviados.length === antes);
+
+// Desactivado: vuelve a ser cliente.
+await store.guardarAjustes({ ...(await store.leerAjustes()), domiciliarios: [{ id: "d1", nombre: "Juan Pablo", telefono: DOMI, activo: false }] });
+await escribe(DOMI, "text", "hola, quiero una gaseosa");
+ok("desactivado: sus mensajes los atiende el asistente como a un cliente", llamadasIA > 0);

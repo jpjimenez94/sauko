@@ -5,10 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "node --env-file-if-exists=.env server.js",
-    "revisar": "node revisar.mjs"
+    "revisar": "node revisar.mjs",
+    "test": "node pruebas/todas.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "latest",
+    "@anthropic-ai/sdk": "0.133.0",
     "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "pg-mem": "3.0.14"
   }
 }
