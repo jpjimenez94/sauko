@@ -1,7 +1,7 @@
 import { bajarImagen, bajarAudio, firmaValida, textoDeBoton } from "../lib/whatsapp.js";
 import { atenderEntrante, cuerpoCrudo } from "../lib/entrada.js";
 import { anotar } from "../lib/store.js";
-import { atenderPanel, guardarEntrante, guardarEstados } from "../lib/conversaciones.js";
+import { atenderPanel, guardarEntrante, guardarEstados, guardarAvisosDeCuenta } from "../lib/conversaciones.js";
 
 // Webhook de WhatsApp Cloud API (Meta directo).
 // Variables: WHATSAPP_VERIFY_TOKEN, WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_APP_SECRET.
@@ -27,6 +27,8 @@ export default async function handler(req, res) {
   const cambios = (cuerpo.entry ?? []).flatMap((e) => e.changes ?? []);
   // Enviado, entregado, leído o falló: para los ✓✓ de las Conversaciones del panel.
   await guardarEstados(cambios.flatMap((c) => c.value?.statuses ?? [])).catch(() => {});
+  // Calidad del número, infracciones, revisiones: avisos de Meta sobre la cuenta (no son mensajes).
+  await guardarAvisosDeCuenta(cambios.filter((c) => c.field && c.field !== "messages")).catch(() => {});
 
   // Quien usa nombre de usuario en WhatsApp no comparte su número: Meta manda su identificador de
   // negocio (BSUID, "CO.1234…") en vez de "from", y se le responde por ese mismo identificador.

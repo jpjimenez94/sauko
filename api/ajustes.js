@@ -44,7 +44,7 @@ export default async function handler(req, res) {
       const yo = await exigirSesion(req, res, req.query?.bitacora ? ["admin"] : undefined);
       if (!yo) return;
       const [ajustes, consumo] = await Promise.all([leerAjustes(), leerConsumo()]);
-      const base = { whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, apagadoSolo: Boolean(ajustes.apagadoSolo), domiciliarios: await domiciliariosPara(ajustes.domiciliarios, yo.rol === "admin") };
+      const base = { whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, apagadoSolo: Boolean(ajustes.apagadoSolo), alertasMeta: ajustes.alertasMeta ?? [], domiciliarios: await domiciliariosPara(ajustes.domiciliarios, yo.rol === "admin") };
       if (yo.rol !== "admin") return res.status(200).json(base);
       const negocio = await cargarNegocio(true);
       const ia = resumenDeIA(ajustes.credito, consumo);
