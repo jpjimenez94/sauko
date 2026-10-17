@@ -590,6 +590,32 @@ input { font: inherit; color: inherit; }
 .perfil-wa .acciones .btn { width: auto; }
 #pw-form .rotulo:has(textarea), #pw-form .acciones { grid-column: 1 / -1; }
 @media (max-width: 700px) { .perfil-wa { grid-template-columns: 1fr; } }
+.clientes { display: grid; gap: 1rem; background: #fff; border-radius: 22px; padding: clamp(1rem, 3vw, 1.6rem); box-shadow: 0 20px 50px -34px rgba(38, 21, 95, 0.5); }
+.clientes__cabeza { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+.clientes__cabeza h2 { font-family: var(--display); font-weight: 800; color: var(--morado-oscuro); font-size: 1.5rem; }
+.clientes__cifras { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.clientes__cifras div { background: var(--lila-claro); border-radius: 16px; padding: 0.6rem 1rem; display: grid; min-width: 110px; }
+.clientes__cifras b { font-family: var(--display); font-size: 1.6rem; color: var(--morado-oscuro); line-height: 1.1; }
+.clientes__cifras span { font-size: 0.8rem; color: #5d5679; }
+.clientes__herramientas { display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: center; }
+.clientes__buscar { flex: 1 1 260px; background: #f3f0fb; }
+.clientes__buscar input { color: var(--tinta); }
+.clientes__buscar input::placeholder { color: #8a83a3; }
+.clientes__buscar svg { color: #6d6688; }
+.clientes__filtros button { background: #f3f0fb; color: var(--morado-oscuro); }
+.clientes__filtros button[aria-pressed="true"] { background: var(--morado-oscuro); color: #fff; }
+.tabla-envoltura { overflow-x: auto; border-radius: 14px; border: 1px solid #ece8f6; }
+.clientes__tabla { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 820px; }
+.clientes__tabla th { text-align: left; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: #6d6688; background: #faf8ff; padding: 0.6rem 0.8rem; position: sticky; top: 0; }
+.clientes__tabla td { padding: 0.6rem 0.8rem; border-top: 1px solid #f0edf8; vertical-align: middle; }
+.clientes__tabla tr:hover td { background: #fbfaff; }
+.clientes__tabla .num { text-align: right; font-variant-numeric: tabular-nums; }
+.cl-quien { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.cl-quien div { display: grid; min-width: 0; }
+.cl-quien strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.cl-quien small { color: #6d6688; }
+.cl-promo { font-size: 0.75rem; font-weight: 700; border-radius: 999px; padding: 0.15rem 0.55rem; background: var(--ok-bg); color: var(--ok); white-space: nowrap; }
+.cl-chat { font-size: 0.8rem; font-weight: 700; padding: 0.35rem 0.8rem; border-radius: 999px; background: var(--morado-oscuro); color: #fff; white-space: nowrap; }
 @media (max-width: 820px) {
   .nav__links { display: none; }
   .hero__sello { width: 118px; right: 0.8rem; bottom: 1rem; }
@@ -827,6 +853,7 @@ input { font: inherit; color: inherit; }
     <p class="pestanas__titulo">Tienda</p>
     <button role="tab" aria-selected="true" data-pest="pedidos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>Pedidos <span class="cuenta num" id="t-pedidos">0</span></button>
     <button role="tab" aria-selected="false" data-pest="conversaciones"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19l1.4-4A8 8 0 1 1 9 18.6z"/><path d="M9 10h6M9 13.5h4"/></svg>Conversaciones <span class="cuenta num" id="t-convs" hidden>0</span></button>
+    <button role="tab" aria-selected="false" data-pest="clientes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 17a3.5 3.5 0 0 1 7 0M15 9.5h3.5M15 13h3.5"/></svg>Clientes</button>
     <button role="tab" aria-selected="false" data-pest="resumen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Resumen</button>
     <p class="pestanas__titulo">Productos</p>
     <button role="tab" aria-selected="false" data-pest="inventario"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7M12 11v10"/></svg>Inventario <span class="cuenta num" id="t-agotados" hidden>0</span></button>
@@ -888,6 +915,35 @@ input { font: inherit; color: inherit; }
         </aside>
         <section class="wa-chat" id="wa-chat" aria-label="Chat abierto"></section>
       </div>
+    </div>
+    <div class="vista" id="pest-clientes" hidden>
+      <section class="clientes">
+        <div class="clientes__cabeza">
+          <div>
+            <h2>Clientes</h2>
+            <p class="vacio">Todos los que le escribieron al WhatsApp del asistente, con lo que han comprado. Se guardan aunque el chat ya no esté en Conversaciones.</p>
+          </div>
+          <div class="clientes__cifras">
+            <div><b class="num" id="cl-total">0</b><span>clientes</span></div>
+            <div><b class="num" id="cl-compraron">0</b><span>han comprado</span></div>
+            <div><b class="num" id="cl-promos">0</b><span>aceptan promociones</span></div>
+          </div>
+        </div>
+        <div class="clientes__herramientas">
+          <label class="wa-buscar clientes__buscar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="cl-buscar" type="search" placeholder="Buscar nombre, número, @usuario o dirección" aria-label="Buscar cliente" autocomplete="off"></label>
+          <div class="wa-filtros clientes__filtros" role="group" aria-label="Filtrar clientes">
+            <button type="button" data-clfiltro="todos" aria-pressed="true">Todos</button>
+            <button type="button" data-clfiltro="compraron" aria-pressed="false">Han comprado</button>
+            <button type="button" data-clfiltro="promos" aria-pressed="false">Aceptan promociones</button>
+          </div>
+          <button class="btn btn--morado" id="cl-exportar" type="button" data-solo-admin hidden>Descargar Excel (CSV)</button>
+        </div>
+        <div class="tabla-envoltura" data-lenis-prevent><table class="clientes__tabla">
+          <thead><tr><th>Cliente</th><th>Dirección</th><th class="num">Pedidos</th><th class="num">Compras</th><th>Último pedido</th><th>Último mensaje</th><th>Promos</th><th></th></tr></thead>
+          <tbody id="cl-filas"></tbody>
+        </table></div>
+        <p class="vacio" id="cl-estado" role="status"></p>
+      </section>
     </div>
     <div class="vista" id="pest-resumen" hidden>
       <section class="kpis" aria-label="Cifras clave">
@@ -1000,6 +1056,7 @@ input { font: inherit; color: inherit; }
           <div class="formulario">
             <label class="rotulo">Lista de prueba <small>teléfonos con 57 o @usuario, separados por coma. Vacía = le contesta a todos</small><input class="campo" id="aj-listaDePrueba" type="text" maxlength="600" autocapitalize="none" spellcheck="false"></label>
             <label class="rotulo">Pausa cuando la tienda contesta a mano (minutos) <small>0 = no se pausa</small><input class="campo" id="aj-pausaMinutos" type="number" min="0" max="720" step="5" inputmode="numeric" required></label>
+            <label class="rotulo">Guardar el historial de los chats (días) <small>de 30 a 1095; fotos y audios solo los guarda WhatsApp 30 días</small><input class="campo" id="aj-historialDias" type="number" min="30" max="1095" step="1" inputmode="numeric" required></label>
           </div>
           <p class="vacio" id="aj-promos"></p>
         </section>
@@ -1919,6 +1976,7 @@ function verPestana(nombre) {
   if (boton) $('seccion-actual').textContent = nombrePestana(boton);
   abrirMenu(false);
   if (lenis) lenis.scrollTo(0, { immediate: true }); else scrollTo(0, 0);
+  if (nombre === 'clientes') cargarClientes();
   if (nombre === 'conversaciones') { cargarChats(); if (CONV.abierto) cargarChat(true); else if (!$('wa-chat').childElementCount) pintarBienvenida(); }
   document.querySelectorAll('.vista[id^="pest-"]').forEach(v => { v.hidden = v.id !== 'pest-' + nombre; });
   if (nombre === 'usuarios') cargarUsuarios();
@@ -2360,6 +2418,55 @@ function subirFotoWA(src) {
 $('pw-logo').onclick = () => subirFotoWA('logo.png');
 $('pw-archivo').onchange = () => { const f = $('pw-archivo').files[0]; $('pw-archivo').value = ''; if (!f) return; const url = URL.createObjectURL(f); subirFotoWA(url).finally(() => URL.revokeObjectURL(url)); };
 
+/* Clientes: ficha permanente de quien escribe al asistente */
+let CLIENTES = [], filtroClientes = 'todos';
+const fechaCorta = ms => ms ? new Date(ms).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' }) : '—';
+const contactoDe = c => esTel(c.id) ? telBonito(c.id) : c.usuario ? '@' + c.usuario : 'Usuario de WhatsApp';
+function clientesFiltrados() {
+  const q = norm($('cl-buscar').value || '');
+  return CLIENTES.filter(c => (filtroClientes !== 'compraron' || c.pedidos > 0) && (filtroClientes !== 'promos' || c.promos) && (!q || norm([c.nombre, c.id, c.usuario, c.direccion].join(' ')).includes(q)));
+}
+function pintarClientes() {
+  $('cl-total').textContent = CLIENTES.length;
+  $('cl-compraron').textContent = CLIENTES.filter(c => c.pedidos > 0).length;
+  $('cl-promos').textContent = CLIENTES.filter(c => c.promos).length;
+  const lista = clientesFiltrados();
+  $('cl-estado').textContent = CLIENTES.length ? (lista.length === CLIENTES.length ? '' : 'Mostrando ' + lista.length + ' de ' + CLIENTES.length + '.') : 'Todavía no hay clientes. Aparecen aquí apenas alguien le escribe al WhatsApp del asistente.';
+  $('cl-filas').replaceChildren(...lista.slice(0, 500).map(c => {
+    const ficha = { id: c.id, nombre: c.nombre, usuario: c.usuario };
+    const verChat = h('button', { class: 'cl-chat', type: 'button' }, 'Ver chat');
+    verChat.onclick = () => { verPestana('conversaciones'); abrirChat(c.id); };
+    return h('tr', null,
+      h('td', null, h('div', { class: 'cl-quien' }, avatarDe(ficha, true), h('div', null, h('strong', null, c.nombre || contactoDe(c)), h('small', null, contactoDe(c))))),
+      h('td', null, c.direccion || '—'),
+      h('td', { class: 'num' }, String(c.pedidos || 0)),
+      h('td', { class: 'num' }, c.total ? pesos(c.total) : '—'),
+      h('td', null, fechaCorta(c.ultimoPedido)),
+      h('td', null, fechaCorta(c.ultimo)),
+      h('td', null, c.promos ? h('span', { class: 'cl-promo', title: 'Autorizó el ' + fechaCorta(c.promosFecha) }, '✓ Sí') : '—'),
+      h('td', null, verChat));
+  }));
+}
+function cargarClientes() {
+  $('cl-estado').textContent = 'Cargando…';
+  return pedir('/api/whatsapp?accion=clientes').then(d => { CLIENTES = d.clientes || []; pintarClientes(); }).catch(e => { $('cl-estado').textContent = 'No se pudieron cargar los clientes: ' + e.message; });
+}
+$('cl-buscar').addEventListener('input', pintarClientes);
+document.querySelectorAll('[data-clfiltro]').forEach(b => b.onclick = () => {
+  filtroClientes = b.dataset.clfiltro;
+  document.querySelectorAll('[data-clfiltro]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  pintarClientes();
+});
+// Excel abre el CSV con ; y BOM (para las tildes). Exporta lo que esté filtrado.
+$('cl-exportar').onclick = () => {
+  const celda = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const filas = [['Nombre', 'WhatsApp o usuario', 'Dirección', 'Primer contacto', 'Último mensaje', 'Pedidos', 'Total comprado', 'Último pedido', 'Acepta promociones', 'Fecha de autorización']]
+    .concat(clientesFiltrados().map(c => [c.nombre, contactoDe(c), c.direccion, fechaCorta(c.primer), fechaCorta(c.ultimo), c.pedidos || 0, c.total || 0, fechaCorta(c.ultimoPedido), c.promos ? 'Sí' : 'No', c.promos ? fechaCorta(c.promosFecha) : '']));
+  const csv = '\ufeff' + filas.map(f => f.map(celda).join(';')).join('\r\n');
+  const a = h('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })), download: 'clientes-sauko-' + new Date().toISOString().slice(0, 10) + '.csv' });
+  document.body.append(a); a.click(); a.remove();
+};
+
 /* Opiniones: lo que respondieron los clientes al entregarles el pedido */
 function cargarOpiniones() {
   return pedir('/api/solicitados?opiniones=1').then(d => {
@@ -2429,7 +2536,7 @@ $('cu-form').onsubmit = e => { e.preventDefault();
     .then(() => { $('cu-form').reset(); $('cu-estado').textContent = 'Contraseña cambiada. Las otras sesiones que tenías abiertas quedaron cerradas.'; }).catch(err => { $('cu-estado').textContent = err.message; }); };
 
 /* Ajustes del negocio: solo para administradores */
-const AJ_NUMEROS = ['domiDesde', 'domiHasta', 'domiPrimeHasta', 'costoDomicilio', 'costoDomicilioPrime', 'costoBolsa', 'pausaMinutos'], AJ_TEXTOS = ['banco', 'cuenta', 'titular', 'llave', 'listaDePrueba'];
+const AJ_NUMEROS = ['domiDesde', 'domiHasta', 'domiPrimeHasta', 'costoDomicilio', 'costoDomicilioPrime', 'costoBolsa', 'pausaMinutos', 'historialDias'], AJ_TEXTOS = ['banco', 'cuenta', 'titular', 'llave', 'listaDePrueba'];
 const hora12 = n => n === 24 ? '12 a.m. (medianoche)' : n === 12 ? '12 p.m. (mediodía)' : (n % 12 || 12) + (n < 12 ? ' a.m.' : ' p.m.');
 for (const id of ['domiDesde', 'domiHasta', 'domiPrimeHasta']) for (let n = id === 'domiDesde' ? 0 : 1; n <= (id === 'domiDesde' ? 23 : 24); n++) $('aj-' + id).append(h('option', { value: String(n) }, hora12(n)));
 function leerAjustesDelFormulario() { const n = {}; for (const k of AJ_NUMEROS) n[k] = Number($('aj-' + k).value); for (const k of AJ_TEXTOS) n[k] = $('aj-' + k).value.trim(); return n; }
