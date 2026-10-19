@@ -557,6 +557,7 @@ input { font: inherit; color: inherit; }
 .wa-cerrada { display: flex; gap: 0.6rem; align-items: center; background: #fff6d6; color: #5c4a00; border-radius: 12px; padding: 0.6rem 0.8rem; font-size: 0.86rem; }
 .wa-ventana { font-size: 0.74rem; color: var(--wa-gris); display: flex; justify-content: space-between; gap: 0.6rem; padding: 0 0.3rem; }
 .wa-error { font-size: 0.82rem; color: var(--mal); padding: 0 0.3rem; }
+.wa-error--ok { color: var(--ok); }
 .wa-bienvenida { flex: 1; display: grid; place-items: center; text-align: center; padding: 2rem; background: #f8f6ff; }
 .wa-bienvenida > div { display: grid; gap: 0.8rem; justify-items: center; max-width: 420px; color: #54656f; }
 .wa-bienvenida h3 { font-family: var(--display); font-size: 1.8rem; color: var(--morado-oscuro); }
@@ -2151,7 +2152,12 @@ function pintarCabeza() {
   ui.sub.textContent = [f.usuario && f.nombre ? '@' + f.usuario : '', esTel(f.id) ? telBonito(f.id) : '', f.ultimoCliente ? 'último mensaje ' + (mismoDia(f.ultimoCliente, Date.now()) ? 'a las ' : '') + cuandoCorto(f.ultimoCliente).toLowerCase() : ''].filter(Boolean).join(' · ');
   if (f.pausa > 0) {
     const devolver = h('button', { class: 'wa-accion wa-accion--suave', type: 'button', title: 'El asistente vuelve a contestar en este chat' }, 'Devolver al asistente');
-    devolver.onclick = () => accionChat('soltar');
+    devolver.onclick = () => {
+      CONV.ui.error.className = 'wa-error wa-error--ok'; CONV.ui.error.textContent = 'Devolviendo el chat…';
+      pedir(urlConv('soltar'), { method: 'POST', body: JSON.stringify({ c: CONV.abierto }) })
+        .then(d => { CONV.ui.error.textContent = d.retomo ? 'El asistente ya respondió lo que estaba pendiente.' : 'El asistente vuelve a atender este chat.'; setTimeout(() => { if (CONV.ui) { CONV.ui.error.className = 'wa-error'; CONV.ui.error.textContent = ''; } }, 6000); cargarChat(); cargarChats(); })
+        .catch(e => { CONV.ui.error.className = 'wa-error'; CONV.ui.error.textContent = e.message; });
+    };
     ui.modo.replaceChildren(h('span', { class: 'wa-chip wa-chip--tienda' }, '👤 Atiende la tienda · ' + minutosRestantes(f.pausa)), devolver);
   } else {
     const tomar = h('button', { class: 'wa-accion', type: 'button', title: 'El asistente deja de contestar en este chat por 2 horas' }, 'Tomar chat');

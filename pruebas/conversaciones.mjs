@@ -100,3 +100,18 @@ ok("fuera de 24 h: no deja escribir y explica por qué", c === 409 && /24 horas/
 // 10. Sin sesión no hay nada
 const [c401] = await llamar({ method: "GET", query: { accion: "chats" }, headers: {} });
 ok("sin sesión: 401", c401 === 401);
+
+// 11. Devolver al asistente con un mensaje del cliente sin responder: el asistente lo responde ya
+let pedidosIA = [];
+const fetchAntes = globalThis.fetch;
+globalThis.fetch = async (url, o = {}) => { if (String(url).includes("anthropic.com")) pedidosIA.push(String(o.body ?? "")); return fetchAntes(url, o); };
+await store.guardarAjustes({ ...(await store.leerAjustes()), whatsappActivo: true });
+await panel("POST", "tomar", { body: { c: CL, horas: 1 } });
+await aviso({ contacts: [{ wa_id: CL }], messages: [{ id: "wamid.pend1", from: CL, type: "text", text: { body: "¿y tienen pan integral?" } }] });
+ok("mientras atiende la tienda, el asistente no contesta", !pedidosIA.length);
+const antesSoltar = enviados.length;
+[c, d] = await panel("POST", "soltar", { body: { c: CL } });
+ok("al devolver: el asistente responde lo pendiente", c === 200 && d.retomo && enviados.length === antesSoltar + 1 && enviados.at(-1).to === CL);
+ok("y sabe lo que se habló mientras tanto", pedidosIA.some((b) => b.includes("La tienda atendió este chat") && b.includes("pan integral")));
+[c, d] = await panel("POST", "soltar", { body: { c: CL } });
+ok("si ya no hay nada pendiente, devolver no manda nada", !d.retomo && enviados.length === antesSoltar + 1);
