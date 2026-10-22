@@ -16,7 +16,12 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).send("Método no permitido");
 
   const crudo = await cuerpoCrudo(req);
-  if (!firmaValida(crudo, req.headers["x-hub-signature-256"])) return res.status(401).send("Firma inválida");
+  if (!firmaValida(crudo, req.headers["x-hub-signature-256"])) {
+    // Si no, un WHATSAPP_APP_SECRET de otra app deja al asistente mudo sin rastro en el Diagnóstico.
+    const linea = String(crudo).match(/"display_phone_number":"(\d+)"/)?.[1];
+    await anotar("aviso de Meta rechazado", `la firma no coincide con WHATSAPP_APP_SECRET${linea ? `; línea que termina en ${linea.slice(-4)}` : ""}`).catch(() => {});
+    return res.status(401).send("Firma inválida");
+  }
   let cuerpo;
   try {
     cuerpo = JSON.parse(crudo);
