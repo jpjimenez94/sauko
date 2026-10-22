@@ -117,3 +117,12 @@ await store.registrarMensaje(BSUID, { id: "wghost", dir: "in", de: "cliente", ti
 const hache = { id: "d4", nombre: "Hache", telefono: "@ghost_bicht", activo: true };
 await store.guardarAjustes({ ...(await store.leerAjustes()), domiciliarios: [hache] });
 ok("con @usuario: también se le abre el turno y se le escribe por su identificador", (await abrirTurnoSiYaEscribio(hache)) && (await store.turnoDe("d4")) === BSUID && /Turno iniciado, Hache/.test(ultimoA(BSUID)));
+
+// Anular un pedido de prueba que ya quedó entregado: queda cancelado, sale de la caja y no se le avisa al cliente.
+await store.guardarPedido({ id: "pprueba01", no: 3208, canal: "WhatsApp", cliente: CLIENTE, status: "entregado", pago: "Contraentrega", items: [{ sku: "7702004007360", name: "Cerveza Poker", price: 4000, qty: 10 }], total: 42200, efectivoPorEntregar: 0, hora: Date.now() });
+let [cod] = await llamar({ id: "pprueba01", cambios: { status: "cancelado", motivo: "El cliente canceló" } });
+ok("un pedido entregado no se cancela con un motivo cualquiera", cod === 400);
+const avisosAntes = enviados.filter((e) => e.a === CLIENTE).length;
+[cod] = await llamar({ id: "pprueba01", cambios: { status: "cancelado", motivo: "Pedido de prueba", devolver: true } });
+const anulado = await store.leerPedido("pprueba01");
+ok("como pedido de prueba sí: queda cancelado y no se le avisa al cliente", cod === 200 && anulado.status === "cancelado" && anulado.motivoCancelacion === "Pedido de prueba" && enviados.filter((e) => e.a === CLIENTE).length === avisosAntes);

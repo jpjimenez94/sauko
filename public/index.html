@@ -1861,7 +1861,7 @@ const yaToca = o => !!horaProgramada(o) && o.status === 'alistando' && Date.now(
 const duracion = ms => { const min = Math.max(1, Math.round(Math.abs(ms) / 60000)); return min < 60 ? min + ' min' : Math.floor(min / 60) + ' h' + (min % 60 ? ' ' + (min % 60) + ' min' : ''); };
 let firmaTablero = '', tarjetasVistas = new Set();
 // Pedidos con el formulario de cancelación abierto, y los motivos (los mismos que acepta el servidor).
-const cancelando = new Set(), MOTIVOS_CANCELACION = ['El cliente canceló', 'No se encontró la dirección', 'No había producto', 'Otro'];
+const cancelando = new Set(), MOTIVOS_CANCELACION = ['El cliente canceló', 'No se encontró la dirección', 'No había producto', 'Otro', 'Pedido de prueba'];
 function tarjeta(o) {
   const pendiente = !!horaProgramada(o) && ['esperando_pago', 'por_confirmar', 'alistando'].includes(o.status), falta = horaProgramada(o) - Date.now();
   // Solo se anima la primera vez que aparece en esa columna.
@@ -1945,6 +1945,9 @@ function tarjeta(o) {
       acts.append(cancelar);
     }
   }
+  // Un pedido de prueba que ya quedó entregado: se anula (queda en el historial como cancelado, no cuenta en
+  // ventas ni en caja y las unidades vuelven). Al cliente no le llega aviso.
+  if (o.status === 'entregado') acts.append(dosPasos(h('button', { class: 'mini mini--mal', type: 'button' }, 'Anular (pedido de prueba)'), '¿Anular el pedido #' + o.no + '?', () => act(o, { status: 'cancelado', motivo: 'Pedido de prueba', devolver: true })));
   if (acts.children.length) el.append(acts);
   return el;
 }

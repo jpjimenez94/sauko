@@ -12,7 +12,7 @@ import { soltarPromo } from "../lib/promo.js";
 const DEL_CLIENTE = ["armando", "esperando_pago", "por_confirmar", "alistando"];
 const DEL_PANEL = ["esperando_pago", "alistando", "en_camino", "entregado", "cancelado"];
 // Por qué se cancela un pedido que ya estaba en la tienda.
-const MOTIVOS = ["El cliente canceló", "No se encontró la dirección", "No había producto", "Otro"];
+const MOTIVOS = ["El cliente canceló", "No se encontró la dirección", "No había producto", "Otro", "Pedido de prueba"];
 const texto = (v, max) => String(v ?? "").slice(0, max);
 
 /** Reconstruye el pedido con nombres y precios del catálogo: lo que diga el navegador no cuenta. */
@@ -99,8 +99,10 @@ export default async function handler(req, res) {
       }
       const estado = req.body?.cambios?.status;
       if (!pedido || !DEL_PANEL.includes(estado)) return res.status(400).json({ error: "Cambio no válido" });
-      // Cancelar solo aplica a pedidos que ya están en la tienda (alistando o en camino).
-      if (estado === "cancelado" && !["alistando", "en_camino"].includes(pedido.status)) return res.status(400).json({ error: "Ese pedido no se puede cancelar desde aquí." });
+      // Cancelar solo aplica a pedidos que ya están en la tienda (alistando o en camino); uno ya entregado
+      // solo se anula si fue de prueba.
+      const dePrueba = estado === "cancelado" && req.body?.cambios?.motivo === "Pedido de prueba";
+      if (estado === "cancelado" && !["alistando", "en_camino"].includes(pedido.status) && !(dePrueba && pedido.status === "entregado")) return res.status(400).json({ error: "Ese pedido no se puede cancelar desde aquí." });
       pedido.status = estado;
       if (estado === "esperando_pago") Object.assign(pedido, { rechazo: Date.now(), proof: "", proofMonto: 0 });
       // Al despachar se asigna el domiciliario y le llega el pedido por WhatsApp.
@@ -114,7 +116,7 @@ export default async function handler(req, res) {
         // Las unidades vuelven una sola vez, y solo si salieron y la tienda no las marcó como perdidas.
         const devolver = req.body?.cambios?.devolver !== false && pedido.descontado && !pedido.devuelto;
         if (devolver) await reponer(pedido.items);
-        Object.assign(pedido, { motivoCancelacion: motivo, canceladoEn: Date.now(), devuelto: Boolean(pedido.devuelto || devolver) });
+        Object.assign(pedido, { motivoCancelacion: motivo, canceladoEn: Date.now(), devuelto: Boolean(pedido.devuelto || devolver), efectivoPorEntregar: 0 });
         // Un pedido cancelado no gasta el descuento del cliente: lo recupera para el próximo (el total se conserva para el historial).
         if (pedido.descuento) await soltarPromo({ ...pedido });
       }
@@ -122,7 +124,8 @@ export default async function handler(req, res) {
       // Cancelado: el tablero no tiene columna para ese estado y no cuenta como venta; se conserva para
       // que la página del cliente se entere y para el historial.
       // Si el pedido llegó por WhatsApp, el aviso le sale al cliente por ese mismo chat.
-      const aviso = await avisoDeTienda(pedido);
+      // A un pedido de prueba no se le avisa nada al cliente.
+      const aviso = dePrueba ? null : await avisoDeTienda(pedido);
       if (aviso && estado === "entregado") await avisarEntrega(pedido, aviso);
       else if (aviso) await enviarTexto(pedido.cliente, aviso);
       return res.status(200).json({ ok: true });
