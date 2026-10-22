@@ -1947,7 +1947,19 @@ function tarjeta(o) {
   }
   // Un pedido de prueba que ya quedó entregado: se anula (queda en el historial como cancelado, no cuenta en
   // ventas ni en caja y las unidades vuelven). Al cliente no le llega aviso.
-  if (o.status === 'entregado') acts.append(dosPasos(h('button', { class: 'mini mini--mal', type: 'button' }, 'Anular (pedido de prueba)'), '¿Anular el pedido #' + o.no + '?', () => act(o, { status: 'cancelado', motivo: 'Pedido de prueba', devolver: true })));
+  // (La confirmación se guarda en "cancelando" porque el tablero se redibuja cada pocos segundos.)
+  if (o.status === 'entregado') {
+    if (cancelando.has(o.id)) {
+      const si = h('button', { class: 'mini mini--mal', type: 'button' }, 'Sí, anular el #' + o.no), no = h('button', { class: 'mini', type: 'button' }, 'Volver');
+      si.onclick = () => { cancelando.delete(o.id); act(o, { status: 'cancelado', motivo: 'Pedido de prueba', devolver: true }); };
+      no.onclick = () => { cancelando.delete(o.id); renderPanel(); };
+      acts.append(si, no);
+    } else {
+      const anular = h('button', { class: 'mini mini--mal', type: 'button' }, 'Anular (pedido de prueba)');
+      anular.onclick = () => { cancelando.add(o.id); renderPanel(); };
+      acts.append(anular);
+    }
+  }
   if (acts.children.length) el.append(acts);
   return el;
 }
