@@ -93,7 +93,7 @@ ok("tomar: el asistente se calla 1 h", (await store.pausaRestante(CL)) > 3500);
 
 // 9. Fuera de la ventana de 24 h no deja escribir
 const VIEJO = "573005554433";
-await store.registrarMensaje(VIEJO, { id: "wamid.viejo", dir: "in", de: "cliente", tipo: "text", texto: "hola", hora: Date.now() - 25 * 3600 * 1000 });
+await store.registrarMensaje(VIEJO, { id: "wamid.viejo", dir: "in", de: "cliente", tipo: "text", texto: "hola", hora: Date.now() - 25 * 3600 * 1000, linea: "111" });
 [c, d] = await panel("POST", "enviar", { body: { c: VIEJO, texto: "hola" } });
 ok("fuera de 24 h: no deja escribir y explica por qué", c === 409 && /24 horas/.test(d.error));
 
@@ -115,3 +115,19 @@ ok("al devolver: el asistente responde lo pendiente", c === 200 && d.retomo && e
 ok("y sabe lo que se habló mientras tanto", pedidosIA.some((b) => b.includes("La tienda atendió este chat") && b.includes("pan integral")));
 [c, d] = await panel("POST", "soltar", { body: { c: CL } });
 ok("si ya no hay nada pendiente, devolver no manda nada", !d.retomo && enviados.length === antesSoltar + 1);
+
+// 12. Cambio de número del asistente: un chat de la línea anterior no se contesta desde la actual
+const OTRA_LINEA = "573001112233";
+await store.registrarMensaje(OTRA_LINEA, { id: "wamid.lineavieja", dir: "in", de: "cliente", tipo: "text", texto: "hola (al 313)", hora: Date.now() - 60000, nombre: "Cliente viejo" });
+[, d] = await panel("GET", "chats");
+const fichaVieja = d.chats.find((f) => f.id === OTRA_LINEA);
+ok("la lista dice cuál es la línea actual y el chat viejo no es de ella", d.linea === "111" && fichaVieja && fichaVieja.linea === "");
+const antesViejo = enviados.length;
+[c, d] = await panel("POST", "enviar", { body: { c: OTRA_LINEA, texto: "hola veci" } });
+ok("responder a mano un chat de la línea anterior: 409 y no sale nada", c === 409 && /línea anterior/.test(d.error) && enviados.length === antesViejo);
+await aviso({ metadata: { phone_number_id: "111", display_phone_number: "573017160877" }, contacts: [{ wa_id: OTRA_LINEA }], messages: [{ id: "wamid.nuevo", from: OTRA_LINEA, type: "text", text: { body: "hola (al 301)" } }] });
+[, d] = await panel("GET", "chat", { query: { c: OTRA_LINEA } });
+ok("cuando escribe a la línea nueva, el mensaje guarda la línea y el número", d.ficha.linea === "111" && d.mensajes.find((m) => m.id === "wamid.nuevo")?.numero === "573017160877");
+await panel("POST", "tomar", { body: { c: OTRA_LINEA, horas: 1 } });
+[c] = await panel("POST", "enviar", { body: { c: OTRA_LINEA, texto: "hola veci, ¿qué necesitas?" } });
+ok("y ya se le puede contestar a mano", c === 200);

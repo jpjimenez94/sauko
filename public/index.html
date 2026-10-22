@@ -424,7 +424,7 @@ input { font: inherit; color: inherit; }
 .wa-buscar svg { width: 18px; height: 18px; opacity: 0.8; flex: none; }
 .wa-buscar input { border: 0; background: none; color: #fff; font: inherit; width: 100%; outline: none; }
 .wa-buscar input::placeholder { color: rgba(255, 255, 255, 0.7); }
-.wa-filtros { display: flex; gap: 0.4rem; }
+.wa-filtros { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .wa-filtros button { font-size: 0.8rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: #fff; }
 .wa-filtros button[aria-pressed="true"] { background: var(--sol); color: var(--tinta); }
 .wa-chats { overflow-y: auto; flex: 1; min-height: 0; }
@@ -442,6 +442,8 @@ input { font: inherit; color: inherit; }
 .wa-chat-item__lado b { background: #25d366; color: #fff; border-radius: 999px; min-width: 20px; height: 20px; padding: 0 6px; display: grid; place-items: center; font-size: 0.72rem; }
 .wa-chat-item--nuevo .wa-chat-item__lado { color: #1fa855; font-weight: 700; }
 .wa-etiqueta { font-size: 0.68rem; font-weight: 700; padding: 0.05rem 0.45rem; border-radius: 999px; background: var(--sol); color: var(--tinta); }
+.wa-etiqueta--vieja { background: #e9edef; color: #54656f; white-space: nowrap; }
+.wa-dia--linea { text-transform: none; letter-spacing: 0; background: #fff4c2; color: #6b5300; }
 .wa-vacio { padding: 2.5rem 1.5rem; text-align: center; color: var(--wa-gris); display: grid; gap: 0.6rem; justify-items: center; }
 .wa-vacio svg { width: 64px; height: 64px; opacity: 0.35; }
 
@@ -912,6 +914,7 @@ input { font: inherit; color: inherit; }
               <button type="button" data-filtro="todos" aria-pressed="true">Todos</button>
               <button type="button" data-filtro="noleidos" aria-pressed="false">No leídos</button>
               <button type="button" data-filtro="tienda" aria-pressed="false">Atiende la tienda</button>
+              <button type="button" data-filtro="linea" aria-pressed="false">Línea actual</button>
             </div>
           </div>
           <div class="wa-chats" id="wa-chats" role="list" data-lenis-prevent></div>
@@ -2014,7 +2017,7 @@ const ICO = {
   chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19l1.4-4A8 8 0 1 1 9 18.6z"/><path d="M9 10h6M9 13.5h4"/></svg>',
 };
 function icono(nombre, clase, titulo) { const s = h('span', { class: clase || '' }); if (titulo) { s.title = titulo; s.setAttribute('aria-label', titulo); } s.innerHTML = ICO[nombre]; return s; }
-const CONV = { chats: [], abierto: null, ficha: null, mensajes: [], firmaLista: '', firmaChat: '', filtro: 'todos', respuesta: null, adjunto: null, emojis: false, ventana: 86400000, ultimoEscribiendo: 0, enviando: false, ui: null, vistos: null, vistosDe: null, tick: 0 };
+const CONV = { chats: [], abierto: null, ficha: null, mensajes: [], firmaLista: '', firmaChat: '', filtro: 'todos', respuesta: null, adjunto: null, emojis: false, ventana: 86400000, linea: '', ultimoEscribiendo: 0, enviando: false, ui: null, vistos: null, vistosDe: null, tick: 0 };
 const CACHE_NODOS = new Map();
 const EMOJIS_REACCION = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 const EMOJIS = '😀 😂 😊 😍 🥰 😉 😎 🤗 🤔 😅 🙏 👍 👌 👏 🙌 💪 ✅ ❌ ⏰ 🛵 🛒 🧾 💵 💳 📍 🏠 🎉 ❤️ 🔥 ⭐ 🥤 🍺 🍞 🥛 🥚 🍌 🍎 🥩 🍫 🍪'.split(' ');
@@ -2031,7 +2034,10 @@ function mismoDia(a, b) { return new Date(a).toDateString() === new Date(b).toDa
 function cuandoCorto(ms) { const ayer = Date.now() - 86400000; return mismoDia(ms, Date.now()) ? hhmm(ms) : mismoDia(ms, ayer) ? 'Ayer' : new Date(ms).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }); }
 function diaLargo(ms) { const ayer = Date.now() - 86400000; return mismoDia(ms, Date.now()) ? 'Hoy' : mismoDia(ms, ayer) ? 'Ayer' : new Date(ms).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' }); }
 const textoBreve = m => m.texto || ({ image: '📷 Foto', audio: '🎤 Nota de voz', video: '🎬 Video', document: '📄 Documento', sticker: 'Sticker', location: '📍 Ubicación', interactive: 'Opciones', boton: 'Botón' })[m.tipo] || 'Mensaje';
-const ventanaAbierta = () => Boolean(CONV.ficha && CONV.ficha.ultimoCliente && Date.now() - CONV.ficha.ultimoCliente < CONV.ventana);
+// El asistente cambió de número: un chat cuyo último mensaje del cliente llegó por otra línea no se puede
+// contestar desde la actual (WhatsApp cuenta las 24 horas por número).
+const deEstaLinea = f => !CONV.linea || (f && f.linea === CONV.linea);
+const ventanaAbierta = () => Boolean(CONV.ficha && deEstaLinea(CONV.ficha) && CONV.ficha.ultimoCliente && Date.now() - CONV.ficha.ultimoCliente < CONV.ventana);
 const minutosRestantes = s => s >= 3600 ? Math.floor(s / 3600) + ' h ' + Math.round((s % 3600) / 60) + ' min' : Math.max(1, Math.round(s / 60)) + ' min';
 function nodoCacheado(clave, crear) { if (!CACHE_NODOS.has(clave)) CACHE_NODOS.set(clave, crear()); return CACHE_NODOS.get(clave); }
 function abrirVisor(src, titulo) { $('visor-titulo').textContent = titulo; $('visor-img').src = src; $('visor-img').classList.remove('real'); $('visor').showModal(); }
@@ -2039,7 +2045,7 @@ function abrirVisor(src, titulo) { $('visor-titulo').textContent = titulo; $('vi
 /* Lista de chats */
 function chatsFiltrados() {
   const q = norm($('wa-buscar').value || '');
-  return CONV.chats.filter(f => (CONV.filtro !== 'noleidos' || f.noLeidos > 0) && (CONV.filtro !== 'tienda' || f.pausa > 0) && (!q || norm(nombreDe(f) + ' ' + f.id + ' ' + (f.usuario || '') + ' ' + (f.ultimo || '')).includes(q)));
+  return CONV.chats.filter(f => (CONV.filtro !== 'noleidos' || f.noLeidos > 0) && (CONV.filtro !== 'tienda' || f.pausa > 0) && (CONV.filtro !== 'linea' || deEstaLinea(f)) && (!q || norm(nombreDe(f) + ' ' + f.id + ' ' + (f.usuario || '') + ' ' + (f.ultimo || '')).includes(q)));
 }
 function pintarChats() {
   const total = CONV.chats.reduce((s, f) => s + (f.noLeidos || 0), 0);
@@ -2050,7 +2056,7 @@ function pintarChats() {
     const ultimo = h('span', { class: 'wa-chat-item__ultimo' });
     if (f.ultimoDir === 'out') ultimo.append(icono('doble'));
     ultimo.append(h('span', null, f.ultimo || ''));
-    const lado = h('span', { class: 'wa-chat-item__lado' }, h('span', null, f.hora ? cuandoCorto(f.hora) : ''), f.noLeidos ? h('b', null, String(f.noLeidos)) : f.pausa > 0 ? h('span', { class: 'wa-etiqueta' }, 'Tienda') : null);
+    const lado = h('span', { class: 'wa-chat-item__lado' }, h('span', null, f.hora ? cuandoCorto(f.hora) : ''), f.noLeidos ? h('b', null, String(f.noLeidos)) : f.pausa > 0 ? h('span', { class: 'wa-etiqueta' }, 'Tienda') : !deEstaLinea(f) ? h('span', { class: 'wa-etiqueta wa-etiqueta--vieja', title: 'El cliente escribió a la línea anterior del asistente' }, 'Línea anterior') : null);
     const item = h('button', { type: 'button', class: 'wa-chat-item' + (f.noLeidos ? ' wa-chat-item--nuevo' : ''), 'aria-current': String(f.id === CONV.abierto) }, avatarDe(f), h('span', { class: 'wa-chat-item__centro' }, h('span', { class: 'wa-chat-item__nombre' }, nombreDe(f)), ultimo), lado);
     item.setAttribute('role', 'listitem');
     item.onclick = () => abrirChat(f.id);
@@ -2059,7 +2065,7 @@ function pintarChats() {
 }
 function cargarChats() {
   return pedir(urlConv('chats')).then(d => {
-    CONV.chats = d.chats || []; CONV.ventana = d.ventana || CONV.ventana;
+    CONV.chats = d.chats || []; CONV.ventana = d.ventana || CONV.ventana; CONV.linea = d.linea || '';
     const firma = JSON.stringify(CONV.chats) + '|' + CONV.abierto + '|' + CONV.filtro;
     if (firma !== CONV.firmaLista) { CONV.firmaLista = firma; pintarChats(); }
     if (!CONV.abierto && !$('wa-chat').childElementCount) pintarBienvenida();
@@ -2128,7 +2134,7 @@ function cargarChat(forzar) {
   if (!id) return Promise.resolve();
   return pedir(urlConv('chat', '&c=' + encodeURIComponent(id))).then(d => {
     if (CONV.abierto !== id || !CONV.ui) return;
-    CONV.ventana = d.ventana || CONV.ventana;
+    CONV.ventana = d.ventana || CONV.ventana; CONV.linea = d.linea || '';
     const firma = JSON.stringify(d.mensajes) + '|' + JSON.stringify(d.ficha);
     CONV.ficha = d.ficha;
     if (!forzar && firma === CONV.firmaChat) { pintarCabeza(); pintarVentana(); return; }
@@ -2170,9 +2176,13 @@ function pintarCabeza() {
 function pintarVentana() {
   const ui = CONV.ui;
   if (!CONV.ficha || !ui) return;
-  const resta = CONV.ficha.ultimoCliente ? CONV.ficha.ultimoCliente + CONV.ventana - Date.now() : -1;
+  const vieja = !deEstaLinea(CONV.ficha);
+  const resta = CONV.ficha.ultimoCliente && !vieja ? CONV.ficha.ultimoCliente + CONV.ventana - Date.now() : -1;
   const abierta = resta > 0;
   ui.cerrada.hidden = abierta; ui.fila.hidden = !abierta;
+  ui.cerrada.lastChild.textContent = vieja
+    ? 'Este cliente le escribió a la línea anterior del asistente. Desde aquí se responde por la línea nueva, y WhatsApp no deja escribirle hasta que el cliente le escriba a esta.'
+    : 'Pasaron más de 24 horas desde el último mensaje del cliente. WhatsApp no deja escribirle libremente hasta que vuelva a escribir.';
   if (!abierta && (CONV.emojis || CONV.respuesta || CONV.adjunto)) { CONV.emojis = false; CONV.respuesta = null; CONV.adjunto = null; pintarExtras(); }
   ui.ventana.replaceChildren(...(abierta ? [h('span', null, 'Puedes responder ' + (resta >= 3600000 ? Math.floor(resta / 3600000) + ' h más' : Math.max(1, Math.round(resta / 60000)) + ' min más')), h('span', null, 'Enter envía · Shift + Enter, nueva línea')] : []));
 }
@@ -2186,10 +2196,16 @@ function pintarMensajes() {
   const primera = CONV.vistosDe !== CONV.abierto;
   if (primera) { CONV.vistos = new Set(); CONV.vistosDe = CONV.abierto; }
   const nodos = [];
-  let dia = '', anterior = null;
+  let dia = '', anterior = null, linea = null;
   for (const m of CONV.mensajes) {
     const d = new Date(m.hora).toDateString();
     if (d !== dia) { dia = d; nodos.push(h('div', { class: 'wa-dia' }, diaLargo(m.hora))); anterior = null; }
+    // Donde el cliente pasa de la línea anterior a la nueva, una marca en el chat.
+    if (m.dir === 'in') {
+      const esta = m.linea || '';
+      if (linea !== null && esta !== linea && esta) { nodos.push(h('div', { class: 'wa-dia wa-dia--linea' }, 'Desde aquí, por la línea ' + (m.numero ? telBonito(m.numero) : 'nueva') + ' del asistente')); anterior = null; }
+      linea = esta;
+    }
     const grupo = !anterior || anterior.dir !== m.dir || anterior.de !== m.de || m.hora - anterior.hora > 5 * 60000;
     nodos.push(burbuja(m, porId, grupo, !primera && !CONV.vistos.has(m.id)));
     CONV.vistos.add(m.id);

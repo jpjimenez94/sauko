@@ -37,15 +37,15 @@ export default async function handler(req, res) {
 
   // Quien usa nombre de usuario en WhatsApp no comparte su número: Meta manda su identificador de
   // negocio (BSUID, "CO.1234…") en vez de "from", y se le responde por ese mismo identificador.
-  const mensajes = cambios.flatMap((c) => (c.value?.messages ?? []).map((m) => ({ m, contactos: c.value?.contacts ?? [] })));
+  const mensajes = cambios.flatMap((c) => (c.value?.messages ?? []).map((m) => ({ m, contactos: c.value?.contacts ?? [], linea: c.value?.metadata ?? {} })));
   const trabajo = Promise.all(
-    mensajes.map(async ({ m, contactos }) => {
+    mensajes.map(async ({ m, contactos, linea }) => {
       const contacto = contactos.find((k) => (m.from && k.wa_id === m.from) || (k.user_id && k.user_id === (m.from_user_id ?? m.user_id))) ?? contactos[0];
       const remitente = m.from || m.from_user_id || m.user_id || contacto?.wa_id || contacto?.user_id;
       // Si aun así no hay remitente, se anota la forma del aviso (solo los nombres de los campos).
       if (!remitente) await anotar("aviso de Meta sin remitente", `mensaje: ${Object.keys(m).join("+")}; contacto: ${Object.keys(contacto ?? {}).join("+")}`).catch(() => {});
       // Todo lo que escribe el cliente queda en el chat del panel, conteste o no el asistente.
-      await guardarEntrante(remitente, m, contacto).catch((e) => console.error("conversación:", e));
+      await guardarEntrante(remitente, m, contacto, linea).catch((e) => console.error("conversación:", e));
       if (m.type === "reaction") return; // una reacción no se contesta
       return atenderEntrante({
         id: m.id,
