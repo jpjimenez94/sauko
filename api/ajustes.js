@@ -5,6 +5,7 @@ import { hayWhatsApp } from "../lib/whatsapp.js";
 import { modeloEnUso } from "../lib/agente.js";
 import { telefonoDomiciliario } from "../lib/domiciliarios.js";
 import { turnoDe } from "../lib/store.js";
+import { promoLimpia, promoDeHoy, PROMO_INICIAL } from "../lib/promo.js";
 
 /** Lo que el panel muestra del gasto en IA. El saldo es una estimación: lo que el administrador dijo que había menos lo gastado desde entonces. */
 function resumenDeIA(credito, consumo) {
@@ -48,7 +49,7 @@ export default async function handler(req, res) {
       if (yo.rol !== "admin") return res.status(200).json(base);
       const negocio = await cargarNegocio(true);
       const ia = resumenDeIA(ajustes.credito, consumo);
-      if (!req.query?.bitacora) return res.status(200).json({ ...base, negocio, ia, promos: await contarPromos() });
+      if (!req.query?.bitacora) return res.status(200).json({ ...base, negocio, ia, promos: await contarPromos(), promo: await promoDeHoy() });
       // Para diagnosticar: los últimos pasos del canal de WhatsApp.
       return res.status(200).json({ ...base, negocio, ia, listaDePrueba: negocio.listaDePrueba, bitacora: await leerBitacora() });
     }
@@ -80,6 +81,8 @@ export default async function handler(req, res) {
         if (!(saldo >= 0 && saldo <= 100000) || !(minimo >= 0 && minimo <= 100000)) return res.status(400).json({ error: "Escribe el saldo y el mínimo en dólares." });
         ajustes.credito = { saldo, minimo, marca: consumo.total, fecha: new Date().toISOString() };
       }
+      // Promoción de la línea del asistente: interruptor, porcentajes y cupos (lib/promo.js).
+      if (req.body?.promo && typeof req.body.promo === "object") ajustes.promo = promoLimpia(req.body.promo, ajustes.promo ?? PROMO_INICIAL);
       // Domiciliarios: la lista completa que manda el panel (nombre, WhatsApp y si está activo).
       if (Array.isArray(req.body?.domiciliarios)) {
         ajustes.domiciliarios = req.body.domiciliarios.slice(0, 20).map((d) => ({
@@ -90,7 +93,7 @@ export default async function handler(req, res) {
         })).filter((d) => d.nombre && (d.telefono.startsWith("@") ? d.telefono.length > 2 : d.telefono.length >= 10));
       }
       await guardarAjustes(ajustes);
-      return res.status(200).json({ domiciliarios: await domiciliariosPara(ajustes.domiciliarios, true), whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, apagadoSolo: Boolean(ajustes.apagadoSolo), negocio: await cargarNegocio(true), ia: resumenDeIA(ajustes.credito, consumo) });
+      return res.status(200).json({ domiciliarios: await domiciliariosPara(ajustes.domiciliarios, true), whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, apagadoSolo: Boolean(ajustes.apagadoSolo), negocio: await cargarNegocio(true), ia: resumenDeIA(ajustes.credito, consumo), promo: await promoDeHoy() });
     }
     return res.status(405).json({ error: "Método no permitido" });
   } catch (error) {

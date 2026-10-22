@@ -1085,6 +1085,24 @@ input { font: inherit; color: inherit; }
         <p class="vacio" id="ia-estado" role="status"></p>
         <p class="vacio">Es una estimación hecha con lo que informa cada respuesta del asistente. El dato oficial y la recarga automática están en console.anthropic.com, en Plans &amp; Billing.</p>
       </section>
+      <section class="caja" id="promo-caja">
+        <h2>Promoción del WhatsApp del asistente</h2>
+        <p class="vacio">El descuento lo calcula el sistema al cerrar el pedido, solo sobre los productos (no el domicilio ni la bolsa), y es uno solo por cliente: su primer pedido con descuento. Si la tienda cancela el pedido, el cliente lo recupera. El total con descuento es el que ven el domiciliario, la devuelta y la caja.</p>
+        <div class="kpis">
+          <div class="kpi kpi--ventas"><strong id="promo-hoy-dia">—</strong><span>Descuentos dados hoy</span></div>
+          <div class="kpi"><strong id="promo-hoy-sorpresa">—</strong><span>Sorpresas hoy</span></div>
+        </div>
+        <form class="formulario" id="promo-form">
+          <label class="rotulo"><span><input type="checkbox" id="promo-activa"> Promoción encendida</span></label>
+          <label class="rotulo">Descuento de bienvenida (%)<input class="campo" id="promo-pct" type="number" min="1" max="50" step="1" required></label>
+          <label class="rotulo">Para los primeros … pedidos de cada día<input class="campo" id="promo-cupo" type="number" min="0" max="500" step="1" required></label>
+          <label class="rotulo">Descuento sorpresa (%) <small>en vez del de bienvenida</small><input class="campo" id="promo-sorpresa-pct" type="number" min="0" max="70" step="1" required></label>
+          <label class="rotulo">Sorpresas por día como máximo<input class="campo" id="promo-sorpresa-tope" type="number" min="0" max="50" step="1" required></label>
+          <label class="rotulo">Probabilidad de la sorpresa <small>1 de cada … pedidos</small><input class="campo" id="promo-sorpresa-cada" type="number" min="1" max="100" step="1" required></label>
+          <button class="btn btn--morado" type="submit">Guardar promoción</button>
+        </form>
+        <p class="vacio" id="promo-estado" role="status"></p>
+      </section>
       <section class="caja" id="pw-caja">
         <h2>Perfil de WhatsApp del asistente</h2>
         <p class="vacio">Lo que ven los clientes al abrir el chat del asistente: la foto, la info y los datos del negocio. Un perfil completo da confianza y ayuda a que WhatsApp no lo tome por una cuenta sospechosa.</p>
@@ -1875,6 +1893,8 @@ function tarjeta(o) {
     const cb = h('input', { type: 'checkbox', id: 'pick-' + o.id + '-' + k, checked: set.has(i.sku) });
     cb.onchange = () => { cb.checked ? set.add(i.sku) : set.delete(i.sku); picked.set(o.id, set); renderPanel(); };
     return h('li', null, h('label', null, cb, txt)); })));
+  // Descuento de la promoción de WhatsApp (solo sobre los productos); el total ya lo trae restado.
+  if (o.descuento) { const sub = (o.items || []).reduce((s, i) => s + i.qty * i.price, 0), valor = Math.round(sub * o.descuento.pct / 100 / 50) * 50; el.append(h('div', { class: 'total' }, h('span', null, (o.descuento.tipo === 'sorpresa' ? '🎁 Descuento sorpresa ' : '🏷️ Descuento de bienvenida ') + o.descuento.pct + ' %'), h('span', { class: 'num' }, '−' + pesos(valor)))); }
   el.append(h('div', { class: 'total' }, h('span', null, 'Total · ' + String(o.pago || '')), h('span', { class: 'num' }, pesos(o.total || 0))));
   // Contraentrega: el domiciliario cobra al entregar y lleva la devuelta lista.
   if (o.pago === 'Contraentrega') el.append(h('div', { class: 'comprobante' }, h('div', null, h('div', null, 'Cobrar ', h('b', { class: 'num' }, pesos(o.total || 0)), ' al entregar'),
@@ -2639,7 +2659,21 @@ $('ia-form').onsubmit = e => { e.preventDefault();
     .then(a => { pintarIA(a); $('ia-saldo-real').value = ''; $('ia-estado').textContent = 'Saldo cuadrado. Desde ahora se descuenta lo que gaste el asistente.'; }).catch(err => { $('ia-estado').textContent = err.message; }); };
 // Cada minuto, sin tocar el formulario de ajustes que alguien pueda estar llenando.
 setInterval(() => { if (vistaActual === 'panel' && panelAbierto) { pedir('/api/ajustes').then(a => { pintarWhatsApp(a); pintarIA(a); pintarDomiciliarios(a); }).catch(() => {}); cargarOpiniones(); } }, 60000);
-function cargarAjustes() { return pedir('/api/ajustes').then(a => { pintarWhatsApp(a); pintarIA(a); pintarDomiciliarios(a); if (a.negocio) pintarAjustes(a.negocio); if (a.promos != null) $('aj-promos').textContent = 'Clientes que autorizaron promociones respondiendo SI PROMOS: ' + a.promos + '.'; }).catch(() => {}); }
+function pintarPromo(p) {
+  if (!p) return;
+  $('promo-activa').checked = Boolean(p.activa);
+  $('promo-pct').value = p.pct; $('promo-cupo').value = p.cupo;
+  $('promo-sorpresa-pct').value = p.sorpresaPct; $('promo-sorpresa-tope').value = p.sorpresaTope; $('promo-sorpresa-cada').value = p.sorpresaCada;
+  $('promo-hoy-dia').textContent = p.hoy ? p.hoy.dia + ' de ' + p.cupo : '—';
+  $('promo-hoy-sorpresa').textContent = p.hoy ? p.hoy.sorpresa + ' de ' + p.sorpresaTope : '—';
+}
+$('promo-form').onsubmit = e => {
+  e.preventDefault();
+  const promo = { activa: $('promo-activa').checked, pct: Number($('promo-pct').value), cupo: Number($('promo-cupo').value), sorpresaPct: Number($('promo-sorpresa-pct').value), sorpresaTope: Number($('promo-sorpresa-tope').value), sorpresaCada: Number($('promo-sorpresa-cada').value) };
+  $('promo-estado').textContent = 'Guardando…';
+  pedir('/api/ajustes', { method: 'POST', body: JSON.stringify({ promo }) }).then(a => { pintarPromo(a.promo); $('promo-estado').textContent = a.promo.activa ? 'Guardado. La promoción ya aplica a los pedidos que se cierren por WhatsApp.' : 'Guardado. La promoción está apagada.'; }).catch(err => { $('promo-estado').textContent = err.message; });
+};
+function cargarAjustes() { return pedir('/api/ajustes').then(a => { pintarWhatsApp(a); pintarIA(a); pintarDomiciliarios(a); pintarPromo(a.promo); if (a.negocio) pintarAjustes(a.negocio); if (a.promos != null) $('aj-promos').textContent = 'Clientes que autorizaron promociones respondiendo SI PROMOS: ' + a.promos + '.'; }).catch(() => {}); }
 $('aj-form').addEventListener('input', () => { $('aj-estado').textContent = ''; vistaPreviaAjustes(); });
 $('aj-form').onsubmit = e => { e.preventDefault();
   const n = leerAjustesDelFormulario();

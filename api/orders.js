@@ -5,6 +5,7 @@ import { avisoDeTienda } from "../lib/conversacion.js";
 import { enviarTexto } from "../lib/whatsapp.js";
 import { avisarEntrega } from "../lib/opiniones.js";
 import { asignarYAvisar } from "../lib/domiciliarios.js";
+import { soltarPromo } from "../lib/promo.js";
 
 // Estados que puede poner la página del cliente y estados que solo mueve el panel.
 // "alistando" solo lo puede poner el cliente cuando paga contraentrega: no hay pago que confirmar.
@@ -114,6 +115,8 @@ export default async function handler(req, res) {
         const devolver = req.body?.cambios?.devolver !== false && pedido.descontado && !pedido.devuelto;
         if (devolver) await reponer(pedido.items);
         Object.assign(pedido, { motivoCancelacion: motivo, canceladoEn: Date.now(), devuelto: Boolean(pedido.devuelto || devolver) });
+        // Un pedido cancelado no gasta el descuento del cliente: lo recupera para el próximo (el total se conserva para el historial).
+        if (pedido.descuento) await soltarPromo({ ...pedido });
       }
       await guardarPedido(pedido);
       // Cancelado: el tablero no tiene columna para ese estado y no cuenta como venta; se conserva para
