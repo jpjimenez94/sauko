@@ -3,7 +3,7 @@ import { cargarNegocio, negocioLimpio } from "../lib/comun.js";
 import { leerAjustes, guardarAjustes, leerBitacora, contarPromos, leerConsumo, marcarAsistenteCaido, reiniciarDatos, anotar } from "../lib/store.js";
 import { hayWhatsApp } from "../lib/whatsapp.js";
 import { modeloEnUso } from "../lib/agente.js";
-import { telefonoDomiciliario } from "../lib/domiciliarios.js";
+import { telefonoDomiciliario, abrirTurnoSiYaEscribio } from "../lib/domiciliarios.js";
 import { turnoDe } from "../lib/store.js";
 import { promoLimpia, promoDeHoy, PROMO_INICIAL } from "../lib/promo.js";
 
@@ -93,6 +93,8 @@ export default async function handler(req, res) {
         })).filter((d) => d.nombre && (d.telefono.startsWith("@") ? d.telefono.length > 2 : d.telefono.length >= 10));
       }
       await guardarAjustes(ajustes);
+      // Un domiciliario recién agregado que ya había escrito "inicio turno" no tiene que volver a escribir.
+      if (Array.isArray(req.body?.domiciliarios)) for (const d of ajustes.domiciliarios) await abrirTurnoSiYaEscribio(d).catch((e) => console.error("turno:", e));
       return res.status(200).json({ domiciliarios: await domiciliariosPara(ajustes.domiciliarios, true), whatsappActivo: ajustes.whatsappActivo, whatsappConectado: hayWhatsApp(), asistenteCaido: consumo.caido, apagadoSolo: Boolean(ajustes.apagadoSolo), negocio: await cargarNegocio(true), ia: resumenDeIA(ajustes.credito, consumo), promo: await promoDeHoy() });
     }
     return res.status(405).json({ error: "Método no permitido" });

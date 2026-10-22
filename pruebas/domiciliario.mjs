@@ -99,3 +99,14 @@ ok("un mensaje repetido no se procesa dos veces", enviados.length === antes);
 await store.guardarAjustes({ ...(await store.leerAjustes()), domiciliarios: [{ id: "d1", nombre: "Juan Pablo", telefono: DOMI, activo: false }] });
 await escribe(DOMI, "text", "hola, quiero una gaseosa");
 ok("desactivado: sus mensajes los atiende el asistente como a un cliente", llamadasIA > 0);
+
+// Domiciliario nuevo que escribió "inicio turno" antes de que lo agregaran en el panel: al agregarlo
+// se le abre el turno sin que tenga que volver a escribir.
+const { abrirTurnoSiYaEscribio } = await import(raiz + "lib/domiciliarios.js");
+const NUEVO = "573151112233";
+await store.registrarMensaje(NUEVO, { id: "wnuevo", dir: "in", de: "cliente", tipo: "text", texto: "Inicio turno", hora: Date.now() - 10 * 60000 });
+const carlos = { id: "d2", nombre: "Carlos", telefono: NUEVO, activo: true };
+await store.guardarAjustes({ ...(await store.leerAjustes()), domiciliarios: [carlos] });
+const abierto = await abrirTurnoSiYaEscribio(carlos);
+ok("agregado después de escribir: el turno queda abierto y se le avisa", abierto && Boolean(await store.turnoDe("d2")) && /Turno iniciado, Carlos/.test(ultimoA(NUEVO)));
+ok("si nunca escribió, no se le abre nada", !(await abrirTurnoSiYaEscribio({ id: "d3", nombre: "Otro", telefono: "573150000000", activo: true })));

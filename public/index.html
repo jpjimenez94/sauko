@@ -1916,7 +1916,8 @@ function tarjeta(o) {
   } else if (picking) {
     const go = h('button', { class: 'btn btn--morado', type: 'button', disabled: set.size < items.length }, 'Despachar');
     // Programado y todavía no es hora: se puede despachar antes, pero pide confirmarlo con un segundo toque.
-    const activos = DOMIS.filter(d => d.activo), elegir = activos.length > 1 ? h('select', { 'aria-label': 'Domiciliario' }, ...activos.map(d => h('option', { value: d.id }, d.nombre + (d.turno ? '' : ' (sin turno)')))) : null;
+    // Los que están en turno van primero: así el elegido por defecto es uno al que sí le llega el pedido.
+    const activos = DOMIS.filter(d => d.activo).sort((a, b) => Number(Boolean(b.turno)) - Number(Boolean(a.turno))), elegir = activos.length > 1 ? h('select', { 'aria-label': 'Domiciliario' }, ...activos.map(d => h('option', { value: d.id }, d.nombre + (d.turno ? '' : ' (sin turno)')))) : null;
     const despachar = () => act(o, { status: 'en_camino', domiciliario: elegir ? elegir.value : (activos[0] || {}).id || '' });
     if (pendiente && !yaToca(o)) { go.textContent = 'Despachar antes de la hora'; go.classList.replace('btn--morado', 'btn--linea'); dosPasos(go, 'Faltan ' + duracion(falta) + ' · ¿Despachar ya?', despachar); }
     else go.onclick = despachar;
