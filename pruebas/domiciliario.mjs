@@ -110,3 +110,10 @@ await store.guardarAjustes({ ...(await store.leerAjustes()), domiciliarios: [car
 const abierto = await abrirTurnoSiYaEscribio(carlos);
 ok("agregado después de escribir: el turno queda abierto y se le avisa", abierto && Boolean(await store.turnoDe("d2")) && /Turno iniciado, Carlos/.test(ultimoA(NUEVO)));
 ok("si nunca escribió, no se le abre nada", !(await abrirTurnoSiYaEscribio({ id: "d3", nombre: "Otro", telefono: "573150000000", activo: true })));
+
+// Lo mismo con un domiciliario registrado por su @usuario (el chat lleva su identificador de WhatsApp).
+const BSUID = "CO.9988776655";
+await store.registrarMensaje(BSUID, { id: "wghost", dir: "in", de: "cliente", tipo: "text", texto: "Inicio turno", hora: Date.now() - 5 * 60000, usuario: "ghost_bicht" });
+const hache = { id: "d4", nombre: "Hache", telefono: "@ghost_bicht", activo: true };
+await store.guardarAjustes({ ...(await store.leerAjustes()), domiciliarios: [hache] });
+ok("con @usuario: también se le abre el turno y se le escribe por su identificador", (await abrirTurnoSiYaEscribio(hache)) && (await store.turnoDe("d4")) === BSUID && /Turno iniciado, Hache/.test(ultimoA(BSUID)));
