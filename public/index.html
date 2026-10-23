@@ -1875,7 +1875,7 @@ function tarjeta(o) {
     o.avisoDomiciliario === 'enviado' ? 'le llegó el pedido por WhatsApp.' : o.avisoDomiciliario === 'sin turno' ? 'no se le pudo avisar porque no ha iniciado turno. Pedile que escriba "inicio turno" al WhatsApp de Sauko.' : 'no se le pudo avisar por WhatsApp. Avisale por teléfono.'));
   if (o.status === 'entregado' && (o.entregadoPor || o.fotoEntrega)) el.append(h('div', { class: 'comprobante' }, o.fotoEntrega ? verFoto(o.fotoEntrega, 'Entrega del pedido #' + o.no + (o.entregadoPor ? ' · ' + o.entregadoPor : '')) : null,
     h('div', null, 'Entregó ' + (o.entregadoPor || 'la tienda'), o.fotoPesada ? h('small', null, ' · la foto está en el WhatsApp') : null)));
-  if (o.status === 'cancelado') el.append(h('p', { class: 'domi-estado domi-estado--mal' }, h('b', null, 'Cancelado' + (o.motivoCancelacion ? ': ' + o.motivoCancelacion : '') + '. '),
+  if (o.status === 'cancelado') el.append(h('p', { class: 'domi-estado domi-estado--mal' }, h('b', null, 'Cancelado' + (o.motivoCancelacion ? ': ' + o.motivoCancelacion : '') + (o.canceladoPor ? ' · por ' + o.canceladoPor : '') + '. '),
     (o.canceladoEn ? new Date(o.canceladoEn).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' · ' : '') + (o.devuelto ? 'Las unidades volvieron al inventario.' : o.descontado ? 'Las unidades no volvieron al inventario.' : 'No había descontado unidades.')));
   if (o.status === 'entregado' && o.efectivoPorEntregar > 0) {
     const caja = dosPasos(h('button', { class: 'mini', type: 'button' }, 'Recibido en caja'), '¿Llegaron ' + pesos(o.efectivoPorEntregar) + '?', () => act(o, { efectivoEnCaja: true }));

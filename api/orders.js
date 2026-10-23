@@ -1,6 +1,6 @@
 import { CATALOGO, METODOS_PAGO, totales, horario, cargarNegocio, revisarProgramado, momentoDe, cantidadValida } from "../lib/comun.js";
 import { exigirSesion } from "../lib/usuarios.js";
-import { listarPedidos, leerPedido, guardarPedido, borrarPedido, reponer } from "../lib/store.js";
+import { listarPedidos, leerPedido, guardarPedido, borrarPedido, reponer, anotar } from "../lib/store.js";
 import { avisoDeTienda } from "../lib/conversacion.js";
 import { enviarTexto } from "../lib/whatsapp.js";
 import { avisarEntrega } from "../lib/opiniones.js";
@@ -90,7 +90,8 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "PATCH") {
-      if (!(await exigirSesion(req, res))) return;
+      const yo = await exigirSesion(req, res);
+      if (!yo) return;
       const pedido = await leerPedido(texto(req.body?.id, 40));
       if (pedido && req.body?.cambios?.efectivoEnCaja === true) {
         Object.assign(pedido, { efectivoPorEntregar: 0, efectivoEnCajaEn: Date.now() });
@@ -116,7 +117,9 @@ export default async function handler(req, res) {
         // Las unidades vuelven una sola vez, y solo si salieron y la tienda no las marcó como perdidas.
         const devolver = req.body?.cambios?.devolver !== false && pedido.descontado && !pedido.devuelto;
         if (devolver) await reponer(pedido.items);
-        Object.assign(pedido, { motivoCancelacion: motivo, canceladoEn: Date.now(), devuelto: Boolean(pedido.devuelto || devolver), efectivoPorEntregar: 0 });
+        // Queda en el Diagnóstico quién lo canceló y por qué (al cliente le llega el aviso).
+        await anotar(`${yo.nombre || yo.usuario} canceló el pedido #${pedido.no}`, motivo).catch(() => {});
+        Object.assign(pedido, { canceladoPor: yo.nombre || yo.usuario, motivoCancelacion: motivo, canceladoEn: Date.now(), devuelto: Boolean(pedido.devuelto || devolver), efectivoPorEntregar: 0 });
         // Un pedido cancelado no gasta el descuento del cliente: lo recupera para el próximo (el total se conserva para el historial).
         if (pedido.descuento) await soltarPromo({ ...pedido });
       }
