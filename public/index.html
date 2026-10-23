@@ -892,11 +892,15 @@ input { font: inherit; color: inherit; }
       <details class="entregados">
         <summary>Entregados <span class="cuenta num" id="n-entregados">0</span></summary>
         <div class="tablero" id="entregados"></div>
-        <div class="acciones"><button class="btn btn--linea" id="limpiar" type="button" hidden>Limpiar entregados</button></div>
       </details>
       <details class="entregados">
         <summary>Cancelados <span class="cuenta num" id="n-cancelados">0</span></summary>
         <div class="tablero" id="cancelados"></div>
+      </details>
+      <details class="entregados" id="archivados-caja">
+        <summary>Archivados <span class="cuenta num" id="n-archivados">0</span></summary>
+        <p class="vacio">Pedidos que se quitaron del tablero en los últimos 7 días. No cuentan en ventas; con "Restaurar" vuelven a su columna y a las ventas.</p>
+        <div class="tablero" id="archivados"></div>
       </details>
       <div class="bitacora">
         <h2>Lo que hizo el asistente en esta pantalla</h2>
@@ -1996,7 +2000,7 @@ function renderPanel() {
     return h('div', { class: 'columna' }, h('h2', null, title, h('span', { class: 'num' }, String(list.length))), ...(list.length ? list.map(tarjeta) : [h('p', { class: 'vacio' }, empty)])); }));
   const entregados = de('entregado');
   $('entregados').replaceChildren(...(entregados.length ? entregados.map(tarjeta) : [h('p', { class: 'vacio' }, 'Todavía no hay entregas.')]));
-  $('n-entregados').textContent = entregados.length; $('limpiar').hidden = !entregados.length;
+  $('n-entregados').textContent = entregados.length;
   const cancelados = panelOrders.filter(o => o.status === 'cancelado').sort((a, b) => (b.canceladoEn || 0) - (a.canceladoEn || 0));
   $('cancelados').replaceChildren(...(cancelados.length ? cancelados.map(tarjeta) : [h('p', { class: 'vacio' }, 'Ningún pedido cancelado.')]));
   $('n-cancelados').textContent = cancelados.length;
@@ -2011,7 +2015,15 @@ function renderPanel() {
   barras('r-pago', agrupar(vendidos, o => String(o.pago || 'Sin dato'), () => 1), n => n + (n === 1 ? ' pedido' : ' pedidos'));
   barras('r-canal', agrupar(vendidos, o => String(o.canal || 'Web'), () => 1), n => n + (n === 1 ? ' pedido' : ' pedidos'));
 }
-$('limpiar').onclick = () => panelOrders.filter(o => o.status === 'entregado').forEach(o => store.remove(o.id).catch(() => {}));
+// Archivados: los que se quitaron del tablero (no cuentan en ventas) y se pueden restaurar.
+function cargarArchivados() {
+  return pedir('/api/orders?archivados=1').then(d => {
+    const lista = d.pedidos || [];
+    $('n-archivados').textContent = lista.length;
+    $('archivados').replaceChildren(...(lista.length ? lista.map(o => { const el = tarjeta(o), b = h('button', { class: 'btn btn--morado', type: 'button' }, 'Restaurar'); b.onclick = () => { b.disabled = true; pedir('/api/orders', { method: 'PATCH', body: JSON.stringify({ id: o.id, restaurar: true }) }).then(() => { b.textContent = "Restaurado: vuelve al tablero en unos segundos"; cargarArchivados(); }).catch(e => { b.disabled = false; b.textContent = e.message; }); }; el.append(h('div', { class: 'acciones' }, b)); return el; }) : [h('p', { class: 'vacio' }, 'Ningún pedido archivado.')]));
+  }).catch(() => {});
+}
+$('archivados-caja').addEventListener('toggle', () => { if ($('archivados-caja').open) cargarArchivados(); });
 function verPestana(nombre) {
   document.querySelectorAll('.pestanas button[data-pest]').forEach(x => x.setAttribute('aria-selected', String(x.dataset.pest === nombre)));
   const boton = document.querySelector('.pestanas [data-pest="' + nombre + '"]');

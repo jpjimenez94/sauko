@@ -1,6 +1,6 @@
 import { CATALOGO, METODOS_PAGO, totales, horario, cargarNegocio, revisarProgramado, momentoDe, cantidadValida } from "../lib/comun.js";
 import { exigirSesion } from "../lib/usuarios.js";
-import { listarPedidos, leerPedido, guardarPedido, borrarPedido, reponer, anotar } from "../lib/store.js";
+import { listarPedidos, leerPedido, guardarPedido, borrarPedido, reponer, anotar, listarArchivados, restaurarPedido } from "../lib/store.js";
 import { avisoDeTienda } from "../lib/conversacion.js";
 import { enviarTexto } from "../lib/whatsapp.js";
 import { avisarEntrega } from "../lib/opiniones.js";
@@ -75,6 +75,7 @@ export default async function handler(req, res) {
         return pedido ? res.status(200).json({ pedido: { ...pedido, proof: "", cliente: undefined } }) : res.status(404).json({ error: "No existe" });
       }
       if (!(await exigirSesion(req, res))) return;
+      if (req.query?.archivados) return res.status(200).json({ pedidos: await listarArchivados() });
       return res.status(200).json({ pedidos: await listarPedidos() });
     }
 
@@ -92,6 +93,14 @@ export default async function handler(req, res) {
     if (req.method === "PATCH") {
       const yo = await exigirSesion(req, res);
       if (!yo) return;
+      // Devolver al tablero un pedido archivado (vuelve a su columna y a las ventas).
+      if (req.body?.restaurar === true) {
+        const archivado = await leerPedido(texto(req.body?.id, 40));
+        if (!archivado) return res.status(404).json({ error: "No existe" });
+        await restaurarPedido(archivado.id);
+        await anotar(`${yo.nombre || yo.usuario} restauró el pedido #${archivado.no}`, archivado.status).catch(() => {});
+        return res.status(200).json({ ok: true });
+      }
       const pedido = await leerPedido(texto(req.body?.id, 40));
       if (pedido && req.body?.cambios?.efectivoEnCaja === true) {
         Object.assign(pedido, { efectivoPorEntregar: 0, efectivoEnCajaEn: Date.now() });
@@ -135,8 +144,14 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "DELETE") {
-      if (!(await exigirSesion(req, res))) return;
+      const yo = await exigirSesion(req, res);
+      if (!yo) return;
+      // Solo se quita del tablero un pedido que no llegó a la tienda (sin pagar): uno entregado es una venta y
+      // uno alistando o en camino se cancela con su motivo.
+      const pedido = await leerPedido(texto(req.query?.id, 40));
+      if (pedido && ["alistando", "en_camino", "entregado"].includes(pedido.status)) return res.status(400).json({ error: "Ese pedido no se puede quitar: es una venta o está en la tienda." });
       await borrarPedido(texto(req.query?.id, 40));
+      if (pedido) await anotar(`${yo.nombre || yo.usuario} quitó del tablero el pedido #${pedido.no}`, pedido.status).catch(() => {});
       return res.status(200).json({ ok: true });
     }
 
