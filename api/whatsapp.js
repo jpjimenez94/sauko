@@ -2,11 +2,25 @@ import { bajarImagen, bajarAudio, firmaValida, textoDeBoton } from "../lib/whats
 import { atenderEntrante, cuerpoCrudo } from "../lib/entrada.js";
 import { anotar } from "../lib/store.js";
 import { atenderPanel, guardarEntrante, guardarEstados, guardarAvisosDeCuenta } from "../lib/conversaciones.js";
+import { enviarRecordatorios } from "../lib/recordatorios.js";
 
 // Webhook de WhatsApp Cloud API (Meta directo).
 // Variables: WHATSAPP_VERIFY_TOKEN, WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_APP_SECRET.
 // Con ?accion=… atiende la sección Conversaciones del panel (con sesión), no a Meta.
 export default async function handler(req, res) {
+  // Recordatorio de pedidos sin cerrar (lib/recordatorios.js): lo llama cron-job.org cada 5 minutos. Si
+  // RECORDATORIOS_CLAVE está configurada, la llamada debe traerla en ?clave=.
+  if (req.query?.accion === "recordatorios") {
+    res.setHeader("Cache-Control", "no-store");
+    const clave = process.env.RECORDATORIOS_CLAVE;
+    if (clave && req.query.clave !== clave) return res.status(403).json({ error: "Clave inválida" });
+    try {
+      return res.status(200).json(await enviarRecordatorios());
+    } catch (error) {
+      console.error("recordatorios:", error);
+      return res.status(500).json({ error: "No se pudieron revisar los recordatorios" });
+    }
+  }
   if (req.query?.accion) return atenderPanel(req, res);
   if (req.method === "GET") {
     const { "hub.mode": modo, "hub.verify_token": token, "hub.challenge": reto } = req.query ?? {};
