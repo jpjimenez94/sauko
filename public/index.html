@@ -1077,6 +1077,7 @@ input { font: inherit; color: inherit; }
           <div class="formulario">
             <label class="rotulo">Lista de prueba <small>teléfonos con 57 o @usuario, separados por coma. Vacía = le contesta a todos</small><input class="campo" id="aj-listaDePrueba" type="text" maxlength="600" autocapitalize="none" spellcheck="false"></label>
             <label class="rotulo">Pausa cuando la tienda contesta a mano (minutos) <small>0 = no se pausa</small><input class="campo" id="aj-pausaMinutos" type="number" min="0" max="720" step="5" inputmode="numeric" required></label>
+            <label class="rotulo">Recordarle al cliente su pedido sin cerrar después de (minutos) <small>una sola vez, en horario de domicilios · 0 = no se le recuerda</small><input class="campo" id="aj-recordarMinutos" type="number" min="0" max="110" step="5" inputmode="numeric" required></label>
             <label class="rotulo">Guardar el historial de los chats (días) <small>de 30 a 1095; fotos y audios solo los guarda WhatsApp 30 días</small><input class="campo" id="aj-historialDias" type="number" min="30" max="1095" step="1" inputmode="numeric" required></label>
           </div>
           <p class="vacio" id="aj-promos"></p>
@@ -2654,7 +2655,7 @@ $('cu-form').onsubmit = e => { e.preventDefault();
     .then(() => { $('cu-form').reset(); $('cu-estado').textContent = 'Contraseña cambiada. Las otras sesiones que tenías abiertas quedaron cerradas.'; }).catch(err => { $('cu-estado').textContent = err.message; }); };
 
 /* Ajustes del negocio: solo para administradores */
-const AJ_NUMEROS = ['domiDesde', 'domiHasta', 'domiPrimeHasta', 'costoDomicilio', 'costoDomicilioPrime', 'costoBolsa', 'pausaMinutos', 'historialDias'], AJ_TEXTOS = ['banco', 'cuenta', 'titular', 'llave', 'listaDePrueba'];
+const AJ_NUMEROS = ['domiDesde', 'domiHasta', 'domiPrimeHasta', 'costoDomicilio', 'costoDomicilioPrime', 'costoBolsa', 'pausaMinutos', 'historialDias', 'recordarMinutos'], AJ_TEXTOS = ['banco', 'cuenta', 'titular', 'llave', 'listaDePrueba'];
 const hora12 = n => n === 24 ? '12 a.m. (medianoche)' : n === 12 ? '12 p.m. (mediodía)' : (n % 12 || 12) + (n < 12 ? ' a.m.' : ' p.m.');
 for (const id of ['domiDesde', 'domiHasta', 'domiPrimeHasta']) for (let n = id === 'domiDesde' ? 0 : 1; n <= (id === 'domiDesde' ? 23 : 24); n++) $('aj-' + id).append(h('option', { value: String(n) }, hora12(n)));
 function leerAjustesDelFormulario() { const n = {}; for (const k of AJ_NUMEROS) n[k] = Number($('aj-' + k).value); for (const k of AJ_TEXTOS) n[k] = $('aj-' + k).value.trim(); return n; }

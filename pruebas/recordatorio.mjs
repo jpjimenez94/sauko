@@ -51,3 +51,18 @@ const { tocaRevisarRecordatorios } = store;
 ok("de paso: la primera vez toca revisar y la siguiente, dentro del minuto, no", (await tocaRevisarRecordatorios()) === true && (await tocaRevisarRecordatorios()) === false);
 await revisarRecordatoriosDePaso();
 ok("y revisar de paso nunca hace fallar la consulta", true);
+
+// Los minutos se ajustan en Ajustes: con 30, a los 25 minutos todavía no; con 0, nunca.
+const { cargarNegocio } = await import(raiz + "lib/comun.js");
+await store.guardarPedido(pedido("pr6", "573001110006")); await conversacion("573001110006", "pr6", 25 * 60000);
+await store.guardarAjustes({ ...(await store.leerAjustes()), whatsappActivo: true, negocio: { recordarMinutos: 30 } }); await cargarNegocio(true);
+const antes6 = enviados.length;
+await enviarRecordatorios(AHORA);
+ok("con 30 minutos en Ajustes: a los 25 todavía no", enviados.length === antes6);
+await store.guardarAjustes({ ...(await store.leerAjustes()), negocio: { recordarMinutos: 0 } }); await cargarNegocio(true);
+await conversacion("573001110006", "pr6", 60 * 60000);
+await enviarRecordatorios(AHORA);
+ok("con 0: apagado, no se le recuerda", enviados.length === antes6);
+await store.guardarAjustes({ ...(await store.leerAjustes()), negocio: { recordarMinutos: 30 } }); await cargarNegocio(true);
+await enviarRecordatorios(AHORA);
+ok("con 30 y una hora sin escribir: sí", enviados.length === antes6 + 1);
