@@ -884,7 +884,7 @@ input { font: inherit; color: inherit; }
         <div class="kpi"><strong id="k-confirmar">0</strong><span>Pago por confirmar</span></div>
         <div class="kpi"><strong id="k-alistando">0</strong><span>Alistando</span></div>
         <div class="kpi"><strong id="k-camino">0</strong><span>En camino</span></div>
-        <div class="kpi kpi--ventas"><strong id="k-ventas">$0</strong><span>Vendido en pedidos</span></div>
+        <div class="kpi kpi--ventas"><strong id="k-ventas">$0</strong><span>Vendido hoy</span></div>
       </section>
       <div class="aviso-stock" id="aviso-ia" role="alert" hidden></div>
       <div class="aviso-stock" id="aviso-opiniones" role="alert" hidden></div>
@@ -2018,9 +2018,10 @@ function renderPanel() {
   $('n-cancelados').textContent = cancelados.length;
   $('k-confirmar').textContent = de('por_confirmar').length; $('k-alistando').textContent = de('alistando').length; $('k-camino').textContent = de('en_camino').length;
   $('t-pedidos').textContent = de('por_confirmar').length + de('alistando').length;
-  // "Vendido en pedidos" (arriba del tablero) es lo del tablero: los últimos 3 días.
-  $('k-ventas').textContent = pesos(panelOrders.filter(o => VENDIDO.includes(o.status)).reduce((s, o) => s + (o.total || 0), 0));
-  if (RESUMEN.periodo === 'hoy') pintarResumen(panelOrders.filter(o => VENDIDO.includes(o.status) && o.hora >= inicioDe('hoy')));
+  // "Vendido hoy" (arriba del tablero) es lo mismo que el Resumen en "Hoy": las ventas confirmadas de hoy.
+  const deHoy = panelOrders.filter(o => VENDIDO.includes(o.status) && o.hora >= inicioDe('hoy'));
+  $('k-ventas').textContent = pesos(deHoy.reduce((s, o) => s + (o.total || 0), 0));
+  if (RESUMEN.periodo === 'hoy') pintarResumen(deHoy);
 }
 // Resumen: hoy sale del tablero; 7 días, 30 días y el mes se piden a la base (el tablero solo trae 3 días).
 const RESUMEN = { periodo: 'hoy' };
