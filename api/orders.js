@@ -1,6 +1,6 @@
 import { CATALOGO, METODOS_PAGO, totales, horario, cargarNegocio, revisarProgramado, momentoDe, cantidadValida } from "../lib/comun.js";
 import { exigirSesion } from "../lib/usuarios.js";
-import { listarPedidos, leerPedido, guardarPedido, borrarPedido, reponer, anotar, listarArchivados, restaurarPedido, listarVentas } from "../lib/store.js";
+import { listarPedidos, leerPedido, guardarPedido, borrarPedido, reponer, anotar, listarArchivados, restaurarPedido, listarVentas, fotosDePedido } from "../lib/store.js";
 import { avisoDeTienda } from "../lib/conversacion.js";
 import { enviarTexto } from "../lib/whatsapp.js";
 import { avisarEntrega } from "../lib/opiniones.js";
@@ -71,6 +71,12 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       // Con id: el cliente consulta su propio pedido. Sin id: la lista completa, solo para el panel.
+      // Las fotos de un pedido (comprobante y entrega), solo para el panel: la lista no las trae.
+      if (req.query?.id && req.query?.fotos) {
+        if (!(await exigirSesion(req, res))) return;
+        const fotos = await fotosDePedido(texto(req.query.id, 40));
+        return fotos ? res.status(200).json(fotos) : res.status(404).json({ error: "No existe" });
+      }
       if (req.query?.id) {
         const pedido = await leerPedido(texto(req.query.id, 40));
         return pedido ? res.status(200).json({ pedido: { ...pedido, proof: "", cliente: undefined } }) : res.status(404).json({ error: "No existe" });
