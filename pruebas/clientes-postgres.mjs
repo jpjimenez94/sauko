@@ -50,3 +50,13 @@ assert.deepEqual(chat.mensajes.map((m) => m.id), ["w1", "w2", "w3"], "el histori
 assert.equal(chat.ficha.nombre, "Ana Pérez");
 
 console.log("Clientes e historial en Postgres: todo bien.");
+
+// Buscar dentro de los mensajes de todas las conversaciones (solo lectura): por chat, el mensaje más reciente.
+const { buscarEnConversaciones } = await import("../lib/store.js");
+const hallados = await buscarEnConversaciones("LECHE");
+assert.equal(hallados.length, 1, "un solo chat menciona leche");
+assert.equal(hallados[0].id, ANA);
+assert.match(hallados[0].texto, /quiero leche/);
+assert.deepEqual(await buscarEnConversaciones("le"), [], "con menos de 3 letras no busca");
+assert.deepEqual(await buscarEnConversaciones("100%"), [], "los comodines se toman como texto");
+console.log("OK    buscar dentro de los mensajes: por chat, sin distinguir mayúsculas, solo lectura");

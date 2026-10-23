@@ -2113,7 +2113,7 @@ const ICO = {
   chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19l1.4-4A8 8 0 1 1 9 18.6z"/><path d="M9 10h6M9 13.5h4"/></svg>',
 };
 function icono(nombre, clase, titulo) { const s = h('span', { class: clase || '' }); if (titulo) { s.title = titulo; s.setAttribute('aria-label', titulo); } s.innerHTML = ICO[nombre]; return s; }
-const CONV = { chats: [], abierto: null, ficha: null, mensajes: [], firmaLista: '', firmaChat: '', filtro: 'todos', respuesta: null, adjunto: null, emojis: false, ventana: 86400000, linea: '', ultimoEscribiendo: 0, enviando: false, ui: null, vistos: null, vistosDe: null, tick: 0 };
+const CONV = { chats: [], abierto: null, ficha: null, mensajes: [], firmaLista: '', firmaChat: '', filtro: 'todos', enMensajes: new Map(), respuesta: null, adjunto: null, emojis: false, ventana: 86400000, linea: '', ultimoEscribiendo: 0, enviando: false, ui: null, vistos: null, vistosDe: null, tick: 0 };
 const CACHE_NODOS = new Map();
 const EMOJIS_REACCION = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 const EMOJIS = '😀 😂 😊 😍 🥰 😉 😎 🤗 🤔 😅 🙏 👍 👌 👏 🙌 💪 ✅ ❌ ⏰ 🛵 🛒 🧾 💵 💳 📍 🏠 🎉 ❤️ 🔥 ⭐ 🥤 🍺 🍞 🥛 🥚 🍌 🍎 🥩 🍫 🍪'.split(' ');
@@ -2141,7 +2141,23 @@ function abrirVisor(src, titulo) { $('visor-titulo').textContent = titulo; $('vi
 /* Lista de chats */
 function chatsFiltrados() {
   const q = norm($('wa-buscar').value || '');
-  return CONV.chats.filter(f => (CONV.filtro !== 'noleidos' || f.noLeidos > 0) && (CONV.filtro !== 'tienda' || f.pausa > 0) && (CONV.filtro !== 'linea' || deEstaLinea(f)) && (!q || norm(nombreDe(f) + ' ' + f.id + ' ' + (f.usuario || '') + ' ' + (f.ultimo || '')).includes(q)));
+  const pasa = f => (CONV.filtro !== 'noleidos' || f.noLeidos > 0) && (CONV.filtro !== 'tienda' || f.pausa > 0) && (CONV.filtro !== 'linea' || deEstaLinea(f));
+  const lista = CONV.chats.filter(f => pasa(f) && (!q || CONV.enMensajes.has(f.id) || norm(nombreDe(f) + ' ' + f.id + ' ' + (f.usuario || '') + ' ' + (f.ultimo || '')).includes(q)));
+  // Chats que solo aparecen por lo que dice un mensaje (más viejos que la lista): con lo mínimo para abrirlos.
+  if (q) for (const [id, r] of CONV.enMensajes) if (!CONV.chats.some(f => f.id === id)) lista.push({ id, nombre: '', usuario: '', ultimo: r.texto, ultimoDir: '', hora: r.hora, noLeidos: 0, pausa: 0, linea: '' });
+  return lista;
+}
+// Buscar también dentro de los mensajes (desde 3 letras), en el servidor y con una pausa mientras se escribe.
+let buscandoEn = 0;
+function buscarEnMensajes() {
+  const q = ($('wa-buscar').value || '').trim();
+  clearTimeout(buscandoEn);
+  if (q.length < 3) { CONV.enMensajes = new Map(); pintarChats(); return; }
+  buscandoEn = setTimeout(() => pedir(urlConv('buscar', '&q=' + encodeURIComponent(q))).then(d => {
+    if (($('wa-buscar').value || '').trim() !== q) return;
+    CONV.enMensajes = new Map((d.resultados || []).map(r => [r.id, r]));
+    pintarChats();
+  }).catch(() => {}), 350);
 }
 function pintarChats() {
   const total = CONV.chats.reduce((s, f) => s + (f.noLeidos || 0), 0);
@@ -2151,7 +2167,9 @@ function pintarChats() {
   $('wa-chats').replaceChildren(...lista.map(f => {
     const ultimo = h('span', { class: 'wa-chat-item__ultimo' });
     if (f.ultimoDir === 'out') ultimo.append(icono('doble'));
-    ultimo.append(h('span', null, f.ultimo || ''));
+    // Si el chat salió por lo que dice un mensaje, se muestra ese mensaje.
+    const hallado = ($('wa-buscar').value || '').trim().length >= 3 && CONV.enMensajes.get(f.id);
+    ultimo.append(h('span', null, hallado ? '🔎 ' + hallado.texto : (f.ultimo || '')));
     const lado = h('span', { class: 'wa-chat-item__lado' }, h('span', null, f.hora ? cuandoCorto(f.hora) : ''), f.noLeidos ? h('b', null, String(f.noLeidos)) : f.pausa > 0 ? h('span', { class: 'wa-etiqueta' }, 'Tienda') : !deEstaLinea(f) ? h('span', { class: 'wa-etiqueta wa-etiqueta--vieja', title: 'El cliente escribió a la línea anterior del asistente' }, 'Línea anterior') : null);
     const item = h('button', { type: 'button', class: 'wa-chat-item' + (f.noLeidos ? ' wa-chat-item--nuevo' : ''), 'aria-current': String(f.id === CONV.abierto) }, avatarDe(f), h('span', { class: 'wa-chat-item__centro' }, h('span', { class: 'wa-chat-item__nombre' }, nombreDe(f)), ultimo), lado);
     item.setAttribute('role', 'listitem');
@@ -2167,7 +2185,7 @@ function cargarChats() {
     if (!CONV.abierto && !$('wa-chat').childElementCount) pintarBienvenida();
   }).catch(() => {});
 }
-$('wa-buscar').addEventListener('input', pintarChats);
+$('wa-buscar').addEventListener('input', () => { pintarChats(); buscarEnMensajes(); });
 document.querySelectorAll('.wa-filtros [data-filtro]').forEach(b => b.onclick = () => {
   CONV.filtro = b.dataset.filtro;
   document.querySelectorAll('.wa-filtros [data-filtro]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
