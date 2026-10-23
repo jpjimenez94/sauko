@@ -1,6 +1,6 @@
 import { CATALOGO, METODOS_PAGO, totales, horario, cargarNegocio, revisarProgramado, momentoDe, cantidadValida } from "../lib/comun.js";
 import { exigirSesion } from "../lib/usuarios.js";
-import { listarPedidos, leerPedido, guardarPedido, borrarPedido, reponer, anotar, listarArchivados, restaurarPedido } from "../lib/store.js";
+import { listarPedidos, leerPedido, guardarPedido, borrarPedido, reponer, anotar, listarArchivados, restaurarPedido, listarVentas } from "../lib/store.js";
 import { avisoDeTienda } from "../lib/conversacion.js";
 import { enviarTexto } from "../lib/whatsapp.js";
 import { avisarEntrega } from "../lib/opiniones.js";
@@ -76,6 +76,11 @@ export default async function handler(req, res) {
       }
       if (!(await exigirSesion(req, res))) return;
       if (req.query?.archivados) return res.status(200).json({ pedidos: await listarArchivados() });
+      // Resumen de varios días: las ventas desde una fecha (máximo un año atrás), sin la foto del comprobante.
+      if (req.query?.ventasDesde) {
+        const desde = Math.max(Date.now() - 366 * 86400000, Math.floor(Number(req.query.ventasDesde)) || 0);
+        return res.status(200).json({ pedidos: (await listarVentas(desde)).map(({ proof, fotoEntrega, ...p }) => p) });
+      }
       return res.status(200).json({ pedidos: await listarPedidos() });
     }
 

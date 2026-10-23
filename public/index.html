@@ -425,6 +425,9 @@ input { font: inherit; color: inherit; }
 .wa-buscar input { border: 0; background: none; color: #fff; font: inherit; width: 100%; outline: none; }
 .wa-buscar input::placeholder { color: rgba(255, 255, 255, 0.7); }
 .wa-filtros { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.periodos { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-bottom: 1rem; }
+.periodos button { font-size: 0.85rem; font-weight: 700; padding: 0.35rem 0.9rem; border-radius: 999px; border: 2px solid var(--morado-oscuro); background: #fff; color: var(--morado-oscuro); }
+.periodos button[aria-pressed="true"] { background: var(--morado-oscuro); color: #fff; }
 .wa-filtros button { font-size: 0.8rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: #fff; }
 .wa-filtros button[aria-pressed="true"] { background: var(--sol); color: var(--tinta); }
 .wa-chats { overflow-y: auto; flex: 1; min-height: 0; }
@@ -956,6 +959,13 @@ input { font: inherit; color: inherit; }
       </section>
     </div>
     <div class="vista" id="pest-resumen" hidden>
+      <div class="periodos" role="group" aria-label="Periodo del resumen">
+        <button type="button" data-periodo="hoy" aria-pressed="true">Hoy</button>
+        <button type="button" data-periodo="7" aria-pressed="false">7 días</button>
+        <button type="button" data-periodo="30" aria-pressed="false">30 días</button>
+        <button type="button" data-periodo="mes" aria-pressed="false">Este mes</button>
+        <span class="vacio" id="r-estado" role="status"></span>
+      </div>
       <section class="kpis" aria-label="Cifras clave">
         <div class="kpi kpi--ventas"><strong id="r-ventas">$0</strong><span>Ventas</span></div>
         <div class="kpi"><strong id="r-pedidos">0</strong><span>Pedidos</span></div>
@@ -963,6 +973,7 @@ input { font: inherit; color: inherit; }
         <div class="kpi"><strong id="r-unidades">0</strong><span>Unidades vendidas</span></div>
       </section>
       <div class="graficas">
+        <section class="caja" id="r-dias-caja" hidden><h2>Ventas por día</h2><div id="r-dias"></div></section>
         <section class="caja"><h2>Lo más vendido</h2><div id="r-productos"></div></section>
         <section class="caja"><h2>Ventas por categoría</h2><div id="r-categorias"></div></section>
         <section class="caja"><h2>Forma de pago</h2><div id="r-pago"></div></section>
@@ -2006,15 +2017,50 @@ function renderPanel() {
   $('n-cancelados').textContent = cancelados.length;
   $('k-confirmar').textContent = de('por_confirmar').length; $('k-alistando').textContent = de('alistando').length; $('k-camino').textContent = de('en_camino').length;
   $('t-pedidos').textContent = de('por_confirmar').length + de('alistando').length;
-  const vendidos = panelOrders.filter(o => VENDIDO.includes(o.status)), ventas = vendidos.reduce((s, o) => s + (o.total || 0), 0);
+  // "Vendido en pedidos" (arriba del tablero) es lo del tablero: los últimos 3 días.
+  $('k-ventas').textContent = pesos(panelOrders.filter(o => VENDIDO.includes(o.status)).reduce((s, o) => s + (o.total || 0), 0));
+  if (RESUMEN.periodo === 'hoy') pintarResumen(panelOrders.filter(o => VENDIDO.includes(o.status) && o.hora >= inicioDe('hoy')));
+}
+// Resumen: hoy sale del tablero; 7 días, 30 días y el mes se piden a la base (el tablero solo trae 3 días).
+const RESUMEN = { periodo: 'hoy' };
+function inicioDe(periodo) {
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  if (periodo === 'mes') d.setDate(1);
+  else if (periodo !== 'hoy') d.setDate(d.getDate() - (Number(periodo) - 1));
+  return d.getTime();
+}
+function pintarResumen(vendidos) {
+  const ventas = vendidos.reduce((s, o) => s + (o.total || 0), 0);
   const lineas = vendidos.flatMap(o => Array.isArray(o.items) ? o.items : []);
-  $('k-ventas').textContent = pesos(ventas); $('r-ventas').textContent = pesos(ventas); $('r-pedidos').textContent = vendidos.length;
+  $('r-ventas').textContent = pesos(ventas); $('r-pedidos').textContent = vendidos.length;
   $('r-ticket').textContent = pesos(vendidos.length ? ventas / vendidos.length : 0); $('r-unidades').textContent = lineas.reduce((s, i) => s + (i.qty || 0), 0);
+  // Por día, en orden de fecha (solo cuando el periodo es de varios días).
+  const varios = RESUMEN.periodo !== 'hoy';
+  $('r-dias-caja').hidden = !varios;
+  if (varios) {
+    const porDia = new Map();
+    for (let t = inicioDe(RESUMEN.periodo); t <= Date.now(); t += 86400000) porDia.set(new Date(t).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }), 0);
+    for (const o of vendidos) { const k = new Date(o.hora).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }); porDia.set(k, (porDia.get(k) || 0) + (o.total || 0)); }
+    const max = Math.max(1, ...porDia.values());
+    $('r-dias').replaceChildren(...[...porDia].map(([dia, valor]) => h('div', { class: 'barra-fila' }, h('span', null, dia), h('i', null, h('b', { style: 'width:' + Math.round(valor / max * 100) + '%' })), h('span', { class: 'num' }, pesos(valor)))));
+  }
   barras('r-productos', agrupar(lineas, i => String(i.name), i => i.qty || 0).slice(0, 6), n => n + ' u.');
   barras('r-categorias', agrupar(lineas, i => (BY_SKU.get(i.sku) || {}).type || 'Otros', i => (i.qty || 0) * (i.price || 0)).slice(0, 6), pesos);
   barras('r-pago', agrupar(vendidos, o => String(o.pago || 'Sin dato'), () => 1), n => n + (n === 1 ? ' pedido' : ' pedidos'));
   barras('r-canal', agrupar(vendidos, o => String(o.canal || 'Web'), () => 1), n => n + (n === 1 ? ' pedido' : ' pedidos'));
 }
+function cargarResumen() {
+  if (RESUMEN.periodo === 'hoy') { $('r-estado').textContent = ''; renderPanel(); return; }
+  $('r-estado').textContent = 'Cargando…';
+  const periodo = RESUMEN.periodo;
+  pedir('/api/orders?ventasDesde=' + inicioDe(periodo)).then(d => { if (RESUMEN.periodo !== periodo) return; $('r-estado').textContent = ''; pintarResumen(d.pedidos || []); })
+    .catch(e => { $('r-estado').textContent = e.message; });
+}
+document.querySelectorAll('.periodos [data-periodo]').forEach(b => b.onclick = () => {
+  RESUMEN.periodo = b.dataset.periodo;
+  document.querySelectorAll('.periodos [data-periodo]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  cargarResumen();
+});
 // Archivados: los que se quitaron del tablero (no cuentan en ventas) y se pueden restaurar.
 function cargarArchivados() {
   return pedir('/api/orders?archivados=1').then(d => {
