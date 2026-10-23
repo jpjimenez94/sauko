@@ -46,3 +46,14 @@ guion.push(herramienta("guardar_pedido", { items, direccion: "Torre 1 apto 101",
 await atenderWhatsApp(CL2, "mejor en efectivo");
 p2 = await store.leerPedido(p2.id);
 ok("un cierre que falla (falta con cuánto paga) no le quita el descuento", p2.descuento?.pct === 5);
+
+// Después de un pedido cancelado, lo que pide el cliente es un pedido nuevo (el cancelado no revive).
+const CL3 = "573001231234";
+guion.push(herramienta("guardar_pedido", { items, direccion: "Torre 2 apto 202", metodo_pago: "Contraentrega" }), herramienta("cerrar_pedido", { paga_con: 50000 }), texto("Confirmado."));
+await atenderWhatsApp(CL3, "efectivo con 50000");
+const primero = await store.leerPedido((await store.leerCharla(CL3)).pedidoId);
+await store.guardarPedido({ ...primero, status: "cancelado", motivoCancelacion: "El cliente canceló" });
+guion.push(herramienta("guardar_pedido", { items, direccion: "Torre 2 apto 202", metodo_pago: "Contraentrega" }), herramienta("cerrar_pedido", { paga_con: 50000 }), texto("Confirmado."));
+await atenderWhatsApp(CL3, "dame lo mismo en efectivo con 50000");
+const segundo = await store.leerPedido((await store.leerCharla(CL3)).pedidoId);
+ok("pedido nuevo después de uno cancelado (el cancelado sigue cancelado)", segundo.id !== primero.id && segundo.status === "alistando" && (await store.leerPedido(primero.id)).status === "cancelado");
