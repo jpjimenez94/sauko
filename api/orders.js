@@ -6,6 +6,7 @@ import { enviarTexto } from "../lib/whatsapp.js";
 import { avisarEntrega } from "../lib/opiniones.js";
 import { asignarYAvisar } from "../lib/domiciliarios.js";
 import { soltarPromo } from "../lib/promo.js";
+import { revisarRecordatoriosDePaso } from "../lib/recordatorios.js";
 
 // Estados que puede poner la página del cliente y estados que solo mueve el panel.
 // "alistando" solo lo puede poner el cliente cuando paga contraentrega: no hay pago que confirmar.
@@ -81,6 +82,8 @@ export default async function handler(req, res) {
         const desde = Math.max(Date.now() - 366 * 86400000, Math.floor(Number(req.query.ventasDesde)) || 0);
         return res.status(200).json({ pedidos: (await listarVentas(desde)).map(({ proof, fotoEntrega, ...p }) => p) });
       }
+      // El panel consulta esto cada pocos segundos: de paso se revisan los recordatorios de pedidos sin cerrar.
+      await revisarRecordatoriosDePaso();
       return res.status(200).json({ pedidos: await listarPedidos() });
     }
 

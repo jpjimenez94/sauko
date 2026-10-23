@@ -2,14 +2,14 @@ import { bajarImagen, bajarAudio, firmaValida, textoDeBoton } from "../lib/whats
 import { atenderEntrante, cuerpoCrudo } from "../lib/entrada.js";
 import { anotar } from "../lib/store.js";
 import { atenderPanel, guardarEntrante, guardarEstados, guardarAvisosDeCuenta } from "../lib/conversaciones.js";
-import { enviarRecordatorios } from "../lib/recordatorios.js";
+import { enviarRecordatorios, revisarRecordatoriosDePaso } from "../lib/recordatorios.js";
 
 // Webhook de WhatsApp Cloud API (Meta directo).
 // Variables: WHATSAPP_VERIFY_TOKEN, WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_APP_SECRET.
 // Con ?accion=… atiende la sección Conversaciones del panel (con sesión), no a Meta.
 export default async function handler(req, res) {
-  // Recordatorio de pedidos sin cerrar (lib/recordatorios.js): lo llama cron-job.org cada 5 minutos. Si
-  // RECORDATORIOS_CLAVE está configurada, la llamada debe traerla en ?clave=.
+  // Recordatorio de pedidos sin cerrar (lib/recordatorios.js), para una tarea programada si algún día la hay.
+  // Si RECORDATORIOS_CLAVE está configurada, la llamada debe traerla en ?clave=.
   if (req.query?.accion === "recordatorios") {
     res.setHeader("Cache-Control", "no-store");
     const clave = process.env.RECORDATORIOS_CLAVE;
@@ -75,5 +75,7 @@ export default async function handler(req, res) {
   // Se responde cuando el asistente termina: si se contesta antes, Vercel corta el trabajo a medias.
   // Si el proveedor reintenta por la demora, el mensaje repetido se descarta.
   await trabajo.catch(() => {});
+  // De paso, los recordatorios de pedidos sin cerrar (como máximo una vez por minuto).
+  await revisarRecordatoriosDePaso();
   res.status(200).send("ok");
 }

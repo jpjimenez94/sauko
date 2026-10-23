@@ -37,10 +37,17 @@ await store.guardarPedido(pedido("pr5", "573001110005")); await conversacion("57
 r = await enviarRecordatorios(Date.parse("2026-10-23T23:30:00-05:00") );
 ok("fuera del horario de domicilios no se le escribe", r.enviados === 0);
 
-// El enlace que llama cron-job.org, con clave.
+// El enlace para una tarea programada, con clave.
 process.env.RECORDATORIOS_CLAVE = "clave-cron";
 const llamar = (query) => new Promise((resolve) => webhook({ method: "GET", headers: {}, query }, { status(c) { this.c = c; return this; }, json(d) { resolve([this.c, d]); }, send(d) { resolve([this.c, d]); }, setHeader() {} }));
 let [c] = await llamar({ accion: "recordatorios" });
 ok("sin la clave: 403", c === 403);
 [c] = await llamar({ accion: "recordatorios", clave: "clave-cron" });
 ok("con la clave: responde", c === 200);
+
+// De paso (sin servicios externos): como máximo una vez por minuto.
+const { revisarRecordatoriosDePaso } = await import(raiz + "lib/recordatorios.js");
+const { tocaRevisarRecordatorios } = store;
+ok("de paso: la primera vez toca revisar y la siguiente, dentro del minuto, no", (await tocaRevisarRecordatorios()) === true && (await tocaRevisarRecordatorios()) === false);
+await revisarRecordatoriosDePaso();
+ok("y revisar de paso nunca hace fallar la consulta", true);
