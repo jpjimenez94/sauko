@@ -78,8 +78,8 @@ export default async function handler(req, res) {
         return fotos ? res.status(200).json(fotos) : res.status(404).json({ error: "No existe" });
       }
       if (req.query?.id) {
-        const pedido = await leerPedido(texto(req.query.id, 40));
-        return pedido ? res.status(200).json({ pedido: { ...pedido, proof: "", cliente: undefined } }) : res.status(404).json({ error: "No existe" });
+        const pedido = await leerPedido(texto(req.query.id, 40), false, false);
+        return pedido ? res.status(200).json({ pedido: { ...pedido, proof: "", fotoEntrega: undefined, tieneComprobante: undefined, tieneFotoEntrega: undefined, cliente: undefined } }) : res.status(404).json({ error: "No existe" });
       }
       if (!(await exigirSesion(req, res))) return;
       if (req.query?.archivados) return res.status(200).json({ pedidos: await listarArchivados() });

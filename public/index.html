@@ -1378,8 +1378,10 @@ function apiStore() {
   const traerPedidos = () => pedir('/api/orders').then(d => { panelListo(true); todos.forEach(f => f(d.pedidos || [])); }).catch(e => { if (e.status === 401) revisarSesion(); else $('vivo-texto').textContent = 'Sin conexión'; });
   const repartir = d => { TOPES = d.topes || {}; agotados.forEach(f => f(d.skus || {})); if (d.existencias) pintarInventario(d); return d; };
   const traerAgotados = () => pedir('/api/agotados').then(repartir).catch(() => {});
-  // El panel se refresca cada 3 s mientras está abierto; el cliente consulta solo su pedido en curso.
-  setInterval(() => { if (vistaActual === 'panel' && panelAbierto) traerPedidos(); }, 3000);
+  // El panel se refresca cada 3 s mientras está a la vista (cada 12 s si la pestaña está en segundo plano, para
+  // que siga sonando el aviso de pedido nuevo); el cliente consulta solo su pedido en curso.
+  let vueltaPedidos = 0;
+  setInterval(() => { vueltaPedidos++; if (vistaActual === 'panel' && panelAbierto && (document.visibilityState === 'visible' || vueltaPedidos % 4 === 0)) traerPedidos(); }, 3000);
   setInterval(() => { for (const p of propios) if (!p.fin) pedir('/api/orders?id=' + encodeURIComponent(p.id)).then(d => { if (d.pedido) { p.fin = ['entregado', 'cancelado'].includes(d.pedido.status); p.fn(d.pedido); } }).catch(() => {}); }, 4000);
   setInterval(traerAgotados, 20000);
   // El panel refresca las unidades para que el aviso de "por agotarse" salga sin recargar.
