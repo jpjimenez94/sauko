@@ -308,7 +308,12 @@ input { font: inherit; color: inherit; }
 .chip--espera { background: var(--lila-claro); color: var(--morado-oscuro); }
 .tarjeta { background: #fff; border-radius: 18px; padding: 1rem; border-left: 8px solid var(--sol); display: grid; gap: 0.6rem; }
 /* Separador por día entre tarjetas: ocupa todo el ancho en Entregados y Cancelados (que van en rejilla). */
-.dia-pedidos { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0 0; font-size: 0.85rem; font-weight: 700; text-transform: capitalize; color: var(--morado-oscuro); }
+.dia-grupo { grid-column: 1 / -1; }
+.dia-tarjetas { display: grid; gap: 1rem; margin-top: 0.6rem; }
+.dia-pedidos { cursor: pointer; list-style: none; grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0 0; font-size: 0.85rem; font-weight: 700; text-transform: capitalize; color: var(--morado-oscuro); }
+.dia-pedidos::-webkit-details-marker { display: none; }
+.dia-pedidos::before { content: "▸"; transition: transform 0.15s; }
+.dia-grupo[open] > .dia-pedidos::before { transform: rotate(90deg); }
 .dia-pedidos::after { content: ""; flex: 1; height: 2px; background: currentColor; opacity: 0.15; }
 .dia-pedidos .num { font-size: 0.75rem; padding: 0 0.45rem; border-radius: 999px; background: var(--sol); color: var(--tinta); }
 .tarjeta--nueva { animation: entra 0.5s ease; }
@@ -1898,16 +1903,20 @@ function diaDePedido(ms) {
   if (ms >= hoy.getTime() - 86400000) return 'Ayer';
   return new Date(ms).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
 }
-function porDia(lista, siempre) {
-  const dias = new Set(lista.map(o => diaDePedido(o.hora)));
-  if (!siempre && dias.size < 2) return lista.map(tarjeta);
-  const nodos = []; let dia = null;
-  for (const o of lista) {
-    const d = diaDePedido(o.hora);
-    if (d !== dia) { dia = d; nodos.push(h('h3', { class: 'dia-pedidos' }, d, h('span', { class: 'num' }, String(lista.filter(x => diaDePedido(x.hora) === d).length)))); }
-    nodos.push(tarjeta(o));
-  }
-  return nodos;
+// Cada día se pliega tocando su separador. Lo que el operario abre o cierra se recuerda aunque el tablero se
+// redibuje cada pocos segundos; de entrada, en Entregados y Cancelados solo "Hoy" está abierto.
+const DIAS_ABIERTOS = new Map();
+function porDia(lista, siempre, donde) {
+  const dias = [...new Set(lista.map(o => diaDePedido(o.hora)))];
+  if (!siempre && dias.length < 2) return lista.map(tarjeta);
+  return dias.map(d => {
+    const clave = donde + '|' + d, suyos = lista.filter(o => diaDePedido(o.hora) === d);
+    const abierto = DIAS_ABIERTOS.has(clave) ? DIAS_ABIERTOS.get(clave) : (!siempre || d === 'Hoy');
+    const grupo = h('details', { class: 'dia-grupo' }, h('summary', { class: 'dia-pedidos' }, d, h('span', { class: 'num' }, String(suyos.length))), h('div', { class: siempre ? 'tablero dia-tarjetas' : 'dia-tarjetas' }, ...suyos.map(tarjeta)));
+    grupo.open = abierto;
+    grupo.addEventListener('toggle', () => DIAS_ABIERTOS.set(clave, grupo.open));
+    return grupo;
+  });
 }
 function tarjeta(o) {
   const pendiente = !!horaProgramada(o) && ['esperando_pago', 'por_confirmar', 'alistando'].includes(o.status), falta = horaProgramada(o) - Date.now();
@@ -2043,13 +2052,13 @@ function renderPanel() {
   const de = st => panelOrders.filter(o => o.status === st).sort((a, b) => turnoDe(a) - turnoDe(b));
   // En las columnas activas el separador por día solo aparece si hay pedidos de más de un día.
   $('tablero').replaceChildren(...COLS.map(([st, title, empty]) => { const list = de(st);
-    return h('div', { class: 'columna' }, h('h2', null, title, h('span', { class: 'num' }, String(list.length))), ...(list.length ? porDia(list, false) : [h('p', { class: 'vacio' }, empty)])); }));
+    return h('div', { class: 'columna' }, h('h2', null, title, h('span', { class: 'num' }, String(list.length))), ...(list.length ? porDia(list, false, st) : [h('p', { class: 'vacio' }, empty)])); }));
   // Entregados y cancelados: lo más reciente primero, agrupado por día.
   const entregados = de('entregado').sort((a, b) => b.hora - a.hora);
-  $('entregados').replaceChildren(...(entregados.length ? porDia(entregados, true) : [h('p', { class: 'vacio' }, 'Todavía no hay entregas.')]));
+  $('entregados').replaceChildren(...(entregados.length ? porDia(entregados, true, 'entregados') : [h('p', { class: 'vacio' }, 'Todavía no hay entregas.')]));
   $('n-entregados').textContent = entregados.length;
   const cancelados = panelOrders.filter(o => o.status === 'cancelado').sort((a, b) => b.hora - a.hora);
-  $('cancelados').replaceChildren(...(cancelados.length ? porDia(cancelados, true) : [h('p', { class: 'vacio' }, 'Ningún pedido cancelado.')]));
+  $('cancelados').replaceChildren(...(cancelados.length ? porDia(cancelados, true, 'cancelados') : [h('p', { class: 'vacio' }, 'Ningún pedido cancelado.')]));
   $('n-cancelados').textContent = cancelados.length;
   $('k-confirmar').textContent = de('por_confirmar').length; $('k-alistando').textContent = de('alistando').length; $('k-camino').textContent = de('en_camino').length;
   $('t-pedidos').textContent = de('por_confirmar').length + de('alistando').length;
