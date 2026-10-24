@@ -1278,7 +1278,8 @@ const MAX_POR_PRODUCTO = 99;
 let CAT = [], TYPES = [], BY_SKU = new Map();
 function loadCatalog(data) {
   TYPES = data.types;
-  const todos = data.rows.map(([sku, name, price, t, foto, unidad]) => ({ sku, name, price, type: TYPES[t], ti: t, foto: !!foto, porLibra: unidad === 'lb', n: norm(name), tok: norm(name).split(' ') }));
+  // codigo: el de Siigo; las variantes (Plátano verde, Cebolla larga) comparten el de su producto base y van aparte en el inventario.
+  const todos = data.rows.map(([sku, name, price, t, foto, unidad, codigo]) => ({ sku, codigo: codigo || sku, name, price, type: TYPES[t], ti: t, foto: !!foto, porLibra: unidad === 'lb', n: norm(name), tok: norm(name).split(' ') }));
   for (const p of todos) if (!BY_SKU.has(p.sku)) BY_SKU.set(p.sku, p);
   CAT = [...BY_SKU.values()]; CAT = [...CAT.filter(p => p.type !== 'Otros'), ...CAT.filter(p => p.type === 'Otros')];
 }
@@ -1946,7 +1947,7 @@ function tarjeta(o) {
   } else if (o.encargo) el.append(h('p', null, h('span', { class: 'chip chip--mal' }, String(o.encargo))));
   const picking = o.status === 'alistando', set = picked.get(o.id) || new Set();
   el.append(h('ul', null, ...items.map((i, k) => { const p = BY_SKU.get(i.sku);
-    const txt = h('span', null, i.qty + ' × ' + i.name, h('small', null, (p ? p.type + ' · ' : '') + i.sku));
+    const txt = h('span', null, i.qty + ' × ' + i.name, h('small', null, (p ? p.type + ' · ' : '') + (p ? p.codigo : i.sku)));
     if (!picking) return h('li', null, txt);
     const cb = h('input', { type: 'checkbox', id: 'pick-' + o.id + '-' + k, checked: set.has(i.sku) });
     cb.onchange = () => { cb.checked ? set.add(i.sku) : set.delete(i.sku); picked.set(o.id, set); renderPanel(); };
@@ -2849,7 +2850,7 @@ function renderInv() {
   if (!CAT.length) return;
   const q = $('inv-q').value.trim(), agotado = p => !!INV.agotados[p.sku] || sinUnidades(p), contado = p => INV.existencias[p.sku] != null;
   // Sin búsqueda: primero lo urgente (por agotarse y agotado), luego lo que se está contando y al final el resto.
-  const lista = q ? [...new Set([...CAT.filter(p => p.sku.includes(q)).slice(0, 10), ...search(q, 30)])]
+  const lista = q ? [...new Set([...CAT.filter(p => p.sku.includes(q) || p.codigo.includes(q)).slice(0, 10), ...search(q, 30)])]
     : [...CAT.filter(porAgotarse), ...CAT.filter(agotado), ...CAT.filter(p => contado(p) && !porAgotarse(p) && !agotado(p)).slice(0, 60), ...CAT.filter(p => !contado(p) && !agotado(p)).slice(0, 30)];
   const fallo = () => { $('vivo-texto').textContent = 'No se pudo guardar el cambio'; };
   $('inv-filas').replaceChildren(...(lista.length ? lista.map(p => { const manual = !!INV.agotados[p.sku], unidades = INV.existencias[p.sku];
@@ -2858,7 +2859,7 @@ function renderInv() {
     const campo = h('input', { type: 'number', min: '0', max: '99999', step: '1', inputMode: 'numeric', placeholder: 'sin contar', value: unidades == null ? '' : String(Math.max(0, unidades)), 'aria-label': 'Unidades de ' + p.name });
     campo.onchange = () => store.setExistencia(p.sku, campo.value.trim() === '' ? null : Number(campo.value)).catch(fallo);
     const estado = sinUnidades(p) ? h('span', { class: 'chip chip--mal' }, 'Sin unidades') : porAgotarse(p) ? h('span', { class: 'chip chip--mal' }, unidades === 1 ? 'Queda 1' : 'Quedan ' + unidades) : null;
-    return h('tr', null, h('td', null, p.name), h('td', { class: 'num' }, p.sku), h('td', null, p.type), h('td', { class: 'n' }, pesos(p.price)), h('td', { class: 'n' }, campo), h('td', null, h('div', { class: 'acciones' }, estado, b))); })
+    return h('tr', null, h('td', null, p.name), h('td', { class: 'num' }, p.codigo), h('td', null, p.type), h('td', { class: 'n' }, pesos(p.price)), h('td', { class: 'n' }, campo), h('td', null, h('div', { class: 'acciones' }, estado, b))); })
     : [h('tr', null, h('td', { colSpan: 6, class: 'vacio' }, 'Ningún producto coincide con esa búsqueda.'))]));
   const n = CAT.filter(p => agotado(p) || porAgotarse(p)).length; $('t-agotados').hidden = !n; $('t-agotados').textContent = n;
 }
