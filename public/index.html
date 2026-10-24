@@ -1878,12 +1878,20 @@ const duracion = ms => { const min = Math.max(1, Math.round(Math.abs(ms) / 60000
 let firmaTablero = '', tarjetasVistas = new Set();
 // Pedidos con el formulario de cancelación abierto, y los motivos (los mismos que acepta el servidor).
 const cancelando = new Set(), MOTIVOS_CANCELACION = ['El cliente canceló', 'No se encontró la dirección', 'No había producto', 'Otro', 'Pedido de prueba'];
+// Fecha y hora del pedido: "Hoy 1:36 p. m.", "Ayer 6:40 p. m." o "mar 21 oct · 11:22 a. m.".
+function fechaDePedido(ms) {
+  const d = new Date(ms), hora = d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  if (ms >= hoy.getTime()) return 'Hoy ' + hora;
+  if (ms >= hoy.getTime() - 86400000) return 'Ayer ' + hora;
+  return d.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ' + hora;
+}
 function tarjeta(o) {
   const pendiente = !!horaProgramada(o) && ['esperando_pago', 'por_confirmar', 'alistando'].includes(o.status), falta = horaProgramada(o) - Date.now();
   // Solo se anima la primera vez que aparece en esa columna.
   const nueva = !tarjetasVistas.has(o.id + ':' + o.status); tarjetasVistas.add(o.id + ':' + o.status);
   const el = h('article', { class: 'tarjeta' + (nueva ? ' tarjeta--nueva' : '') + (yaToca(o) ? ' tarjeta--toca' : pendiente ? ' tarjeta--espera' : '') }), items = Array.isArray(o.items) ? o.items : [];
-  el.append(h('div', { class: 'tarjeta__cabeza' }, h('strong', { class: 'n num' }, '#' + o.no), h('small', { class: 'num' }, new Date(o.hora).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) + ' · ' + String(o.canal || 'Web') + (o.cliente ? ' +' + String(o.cliente).replace(/^[+]/, '') : ''))));
+  el.append(h('div', { class: 'tarjeta__cabeza' }, h('strong', { class: 'n num' }, '#' + o.no), h('small', { class: 'num' }, fechaDePedido(o.hora) + ' · ' + String(o.canal || 'Web') + (o.cliente ? ' +' + String(o.cliente).replace(/^[+]/, '') : ''))));
   el.append(h('p', null, h('b', null, 'Entrega: '), String(o.direccion || '')));
   // Código del pedido: se escribe en la bolsa al alistar y es el que manda el domiciliario al entregar.
   if (o.codigo && ['alistando', 'en_camino'].includes(o.status)) el.append(h('p', { class: 'codigo-bolsa' }, h('span', null, o.status === 'alistando' ? 'Código para la bolsa' : 'Código'), h('b', { class: 'num' }, o.codigo)));
