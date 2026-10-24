@@ -307,6 +307,10 @@ input { font: inherit; color: inherit; }
 .tarjeta--toca .programado b { color: var(--mal); }
 .chip--espera { background: var(--lila-claro); color: var(--morado-oscuro); }
 .tarjeta { background: #fff; border-radius: 18px; padding: 1rem; border-left: 8px solid var(--sol); display: grid; gap: 0.6rem; }
+/* Separador por día entre tarjetas: ocupa todo el ancho en Entregados y Cancelados (que van en rejilla). */
+.dia-pedidos { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0 0; font-size: 0.85rem; font-weight: 700; text-transform: capitalize; color: var(--morado-oscuro); }
+.dia-pedidos::after { content: ""; flex: 1; height: 2px; background: currentColor; opacity: 0.15; }
+.dia-pedidos .num { font-size: 0.75rem; padding: 0 0.45rem; border-radius: 999px; background: var(--sol); color: var(--tinta); }
 .tarjeta--nueva { animation: entra 0.5s ease; }
 @keyframes entra { from { transform: translateY(16px); opacity: 0; } }
 .tarjeta__cabeza { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
@@ -1886,6 +1890,25 @@ function fechaDePedido(ms) {
   if (ms >= hoy.getTime() - 86400000) return 'Ayer ' + hora;
   return d.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ' + hora;
 }
+// Las tarjetas con un separador por día ("Hoy", "Ayer", "jueves, 22 de octubre"). siempre=false: solo si hay
+// pedidos de más de un día.
+function diaDePedido(ms) {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  if (ms >= hoy.getTime()) return 'Hoy';
+  if (ms >= hoy.getTime() - 86400000) return 'Ayer';
+  return new Date(ms).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+function porDia(lista, siempre) {
+  const dias = new Set(lista.map(o => diaDePedido(o.hora)));
+  if (!siempre && dias.size < 2) return lista.map(tarjeta);
+  const nodos = []; let dia = null;
+  for (const o of lista) {
+    const d = diaDePedido(o.hora);
+    if (d !== dia) { dia = d; nodos.push(h('h3', { class: 'dia-pedidos' }, d, h('span', { class: 'num' }, String(lista.filter(x => diaDePedido(x.hora) === d).length)))); }
+    nodos.push(tarjeta(o));
+  }
+  return nodos;
+}
 function tarjeta(o) {
   const pendiente = !!horaProgramada(o) && ['esperando_pago', 'por_confirmar', 'alistando'].includes(o.status), falta = horaProgramada(o) - Date.now();
   // Solo se anima la primera vez que aparece en esa columna.
@@ -2018,13 +2041,15 @@ function avisarNuevos(lista) {
 }
 function renderPanel() {
   const de = st => panelOrders.filter(o => o.status === st).sort((a, b) => turnoDe(a) - turnoDe(b));
+  // En las columnas activas el separador por día solo aparece si hay pedidos de más de un día.
   $('tablero').replaceChildren(...COLS.map(([st, title, empty]) => { const list = de(st);
-    return h('div', { class: 'columna' }, h('h2', null, title, h('span', { class: 'num' }, String(list.length))), ...(list.length ? list.map(tarjeta) : [h('p', { class: 'vacio' }, empty)])); }));
-  const entregados = de('entregado');
-  $('entregados').replaceChildren(...(entregados.length ? entregados.map(tarjeta) : [h('p', { class: 'vacio' }, 'Todavía no hay entregas.')]));
+    return h('div', { class: 'columna' }, h('h2', null, title, h('span', { class: 'num' }, String(list.length))), ...(list.length ? porDia(list, false) : [h('p', { class: 'vacio' }, empty)])); }));
+  // Entregados y cancelados: lo más reciente primero, agrupado por día.
+  const entregados = de('entregado').sort((a, b) => b.hora - a.hora);
+  $('entregados').replaceChildren(...(entregados.length ? porDia(entregados, true) : [h('p', { class: 'vacio' }, 'Todavía no hay entregas.')]));
   $('n-entregados').textContent = entregados.length;
-  const cancelados = panelOrders.filter(o => o.status === 'cancelado').sort((a, b) => (b.canceladoEn || 0) - (a.canceladoEn || 0));
-  $('cancelados').replaceChildren(...(cancelados.length ? cancelados.map(tarjeta) : [h('p', { class: 'vacio' }, 'Ningún pedido cancelado.')]));
+  const cancelados = panelOrders.filter(o => o.status === 'cancelado').sort((a, b) => b.hora - a.hora);
+  $('cancelados').replaceChildren(...(cancelados.length ? porDia(cancelados, true) : [h('p', { class: 'vacio' }, 'Ningún pedido cancelado.')]));
   $('n-cancelados').textContent = cancelados.length;
   $('k-confirmar').textContent = de('por_confirmar').length; $('k-alistando').textContent = de('alistando').length; $('k-camino').textContent = de('en_camino').length;
   $('t-pedidos').textContent = de('por_confirmar').length + de('alistando').length;
