@@ -350,6 +350,10 @@ input { font: inherit; color: inherit; }
 .panel.bloqueado .pestanas, .panel.bloqueado main { display: none; }
 .aviso-stock { background: var(--mal-bg); color: var(--mal); border-radius: 16px; padding: 0.8rem 1rem; display: grid; gap: 0.4rem; justify-items: start; font-size: 0.92rem; }
 .aviso-stock .mini { border-color: var(--mal); }
+/* Meta está rechazando los mensajes: va arriba en todas las secciones y no se puede cerrar hasta que vuelvan a salir. */
+.aviso-envio { background: var(--mal); color: #fff; border-radius: 16px; padding: 0.9rem 1.1rem; margin-bottom: 1rem; display: grid; gap: 0.35rem; font-size: 0.95rem; line-height: 1.4; box-shadow: 0 6px 20px rgba(173, 38, 32, 0.28); }
+.aviso-envio strong { font-size: 1.05rem; }
+.aviso-envio small { opacity: 0.85; }
 .panel td input[type=number]::placeholder { font-size: 0.72rem; }
 .quien { font-size: 0.85rem; opacity: 0.85; white-space: nowrap; }
 .formulario { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.8rem; align-items: end; }
@@ -895,6 +899,7 @@ input { font: inherit; color: inherit; }
   </nav>
   <button class="menu-fondo" id="menu-fondo" type="button" aria-label="Cerrar el menú"></button>
   <main>
+    <div class="aviso-envio" id="aviso-envio" role="alert" hidden></div>
     <div class="vista" id="pest-pedidos">
       <section class="kpis" aria-label="Resumen rápido">
         <div class="kpi"><strong id="k-confirmar">0</strong><span>Pago por confirmar</span></div>
@@ -2321,10 +2326,27 @@ function avisarChats(chats) {
   const aLaVista = id => id === CONV.abierto && !$('pest-conversaciones').hidden && document.visibilityState === 'visible';
   if (sonidoChats && antes && chats.some(f => (f.ultimoCliente || 0) > (antes.get(f.id) || 0) && f.ultimoDir === 'in' && deEstaLinea(f) && !esDomiciliario(f) && !aLaVista(f.id))) sonarChat();
 }
+// Aviso rojo cuando Meta rechaza lo que se manda: los clientes no reciben ni al asistente ni a la tienda.
+let envioAvisado = 0;
+function pintarEnvio(e) {
+  const caja = $('aviso-envio');
+  caja.hidden = !e;
+  if (!e) { envioAvisado = 0; return; }
+  const desde = new Date(e.desde).toLocaleString('es-CO', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+  const cuantos = e.mensajes ? e.mensajes + (e.mensajes === 1 ? ' mensaje' : ' mensajes') + (e.clientes > 1 ? ' a ' + e.clientes + ' clientes' : '') + ' sin entregar. ' : '';
+  caja.replaceChildren(
+    h('strong', null, '⚠ Los clientes NO están recibiendo los mensajes desde ' + desde),
+    h('span', null, cuantos + e.explicacion),
+    h('span', null, 'Ni lo que responde el asistente ni lo que escriben desde el panel les llega. Cuando se arregle, este aviso se quita solo y hay que volver a escribirles a esos clientes.'),
+    h('small', null, 'Error de Meta: ' + e.motivo));
+  // Suena una vez cuando empieza (y no cada vez que se refresca).
+  if (envioAvisado !== e.desde) { envioAvisado = e.desde; sonar(); }
+}
 function cargarChats() {
   return pedir(urlConv('chats')).then(d => {
     CONV.chats = d.chats || []; CONV.ventana = d.ventana || CONV.ventana; CONV.linea = d.linea || '';
     avisarChats(CONV.chats);
+    pintarEnvio(d.envio);
     const firma = JSON.stringify(CONV.chats) + '|' + CONV.abierto + '|' + CONV.filtro;
     if (firma !== CONV.firmaLista) { CONV.firmaLista = firma; pintarChats(); }
     if (!CONV.abierto && !$('wa-chat').childElementCount) pintarBienvenida();

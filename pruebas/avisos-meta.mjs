@@ -13,3 +13,16 @@ await avisar("phone_number_quality_update", { display_phone_number: "57313629525
 await avisar("account_update", { event: "ACCOUNT_VIOLATION", violation_info: { violation_type: "SCAM" } });
 const alertas = (await store.leerAjustes()).alertasMeta ?? [];
 ok("calidad marcada e infracción: quedan como alertas para el panel (" + alertas.length + ")", alertas.length === 2 && /SCAM/.test(alertas[0].resumen) && alertas[1].tema === "calidad del número");
+
+// Meta rechaza los envíos (sin método de pago, token vencido…): el panel lo dice en rojo hasta que vuelvan a salir.
+const { envioCaido } = await import("../lib/conversaciones.js");
+const estado = (id, destino, status, errors) => avisar("messages", { statuses: [{ id, recipient_id: destino, status, ...(errors ? { errors } : {}) }] });
+await estado("w1", "573001112222", "failed", [{ code: 131026, title: "Message undeliverable" }]);
+ok("un cliente que no recibe (131026) no es alarma", envioCaido(await store.leerEnvio()) === null);
+await estado("w2", "573001113333", "failed", [{ code: 131042, title: "Business eligibility payment issue" }]);
+const caido = envioCaido(await store.leerEnvio());
+ok("131042 (pago): aviso rojo con la explicación de la tarjeta", caido && /pago/.test(caido.explicacion) && caido.clientes === 2 && caido.mensajes === 2);
+await estado("w3", "573001114444", "delivered");
+ok("cuando vuelve a entregar, el aviso se quita", envioCaido(await store.leerEnvio()) === null);
+for (const [i, d] of ["573001110001", "573001110002", "573001110003"].entries()) await estado("x" + i, d, "failed", [{ code: 131000, title: "Something went wrong" }]);
+ok("error desconocido seguido a varios clientes: también avisa", /131000/.test(envioCaido(await store.leerEnvio())?.motivo ?? ""));
