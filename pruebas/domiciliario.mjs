@@ -138,3 +138,12 @@ const avisosAntes = enviados.filter((e) => e.a === CLIENTE).length;
 [cod] = await llamar({ id: "pprueba01", cambios: { status: "cancelado", motivo: "Pedido de prueba", devolver: true } });
 const anulado = await store.leerPedido("pprueba01");
 ok("como pedido de prueba sí: queda cancelado y no se le avisa al cliente", cod === 200 && anulado.status === "cancelado" && anulado.motivoCancelacion === "Pedido de prueba" && enviados.filter((e) => e.a === CLIENTE).length === avisosAntes);
+
+// Foto de entrega puesta a mano desde el panel (la que el domiciliario dejó en el chat).
+await store.guardarPedido({ id: "pfotomano1", no: 6052, canal: "WhatsApp", cliente: CLIENTE, status: "entregado", pago: "Transferencia", items: [{ sku: "1", name: "Pan", price: 1000, qty: 1 }], total: 3200, hora: Date.now(), domiciliario: { id: "d1", nombre: "Juan Esteban" } });
+const FOTO_PANEL = "data:image/jpeg;base64," + "B".repeat(2000);
+let [cf] = await llamar({ id: "pfotomano1", cambios: { fotoEntrega: FOTO_PANEL } });
+const conFoto = await store.leerPedido("pfotomano1");
+ok("desde el panel se guarda la foto de entrega de un pedido entregado (y quién entregó)", cf === 200 && conFoto.fotoEntrega === FOTO_PANEL && conFoto.entregadoPor === "Juan Esteban" && conFoto.status === "entregado");
+[cf] = await llamar({ id: "pfotomano1", cambios: { fotoEntrega: FOTO_PANEL } });
+ok("no reemplaza una foto que ya tiene", cf === 409);

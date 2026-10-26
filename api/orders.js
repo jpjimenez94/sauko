@@ -122,6 +122,18 @@ export default async function handler(req, res) {
         await guardarPedido(pedido);
         return res.status(200).json({ ok: true });
       }
+      // Foto de la entrega puesta a mano (por ejemplo, la que el domiciliario mandó al chat cuando la tienda ya lo
+      // había marcado entregado). Llega ya reducida desde el panel. No reemplaza una que ya tenga.
+      if (pedido && typeof req.body?.cambios?.fotoEntrega === "string") {
+        const foto = req.body.cambios.fotoEntrega;
+        if (!foto.startsWith("data:image/jpeg;base64,") || foto.length < 1000 || foto.length > 300_000) return res.status(400).json({ error: "La foto no es válida." });
+        if (pedido.status !== "entregado") return res.status(400).json({ error: "Solo a un pedido entregado." });
+        if (pedido.fotoEntrega) return res.status(409).json({ error: "Ese pedido ya tiene foto de entrega." });
+        Object.assign(pedido, { fotoEntrega: foto, fotoPesada: false, ...(pedido.entregadoPor ? {} : pedido.domiciliario?.nombre ? { entregadoPor: pedido.domiciliario.nombre } : {}) });
+        await guardarPedido(pedido);
+        await anotar(`${yo.nombre || yo.usuario} guardó la foto de entrega del pedido #${pedido.no}`, "desde el chat").catch(() => {});
+        return res.status(200).json({ ok: true });
+      }
       // Lo que el cliente agregó a un pedido ya pagado: la tienda confirma que llegó la transferencia de la diferencia.
       if (pedido && req.body?.cambios?.diferenciaConfirmada === true) {
         if (!pedido.diferencia || pedido.diferencia.pago !== "Transferencia") return res.status(400).json({ error: "Ese pedido no tiene una diferencia por transferencia." });
