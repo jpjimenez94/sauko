@@ -65,7 +65,7 @@ ok("con turno: le llega el pedido con título, sin número de pedido y sin cobra
 
 // Código equivocado.
 await escribe(DOMI, "text", "0000");
-ok("código equivocado: se le dice", /no corresponde/.test(ultimoA(DOMI)));
+ok("código equivocado: se le dice que no existe", /No encuentro ningún pedido con el número 0000/.test(ultimoA(DOMI)));
 
 // Código bien, sin foto: se le pide la foto.
 await escribe(DOMI, "text", p.codigo);
@@ -73,7 +73,19 @@ ok("código sin foto: se le pide la foto", /mandá la foto/.test(ultimoA(DOMI)))
 await escribe(DOMI, "image", "");
 p = await store.leerPedido(otro.id);
 ok("foto después del código: entregado, con foto y quién entregó", p.status === "entregado" && p.entregadoPor === "Juan Pablo" && p.fotoEntrega.startsWith("data:image/jpeg"));
+
 ok("al domiciliario le confirma con el título", ultimoA(DOMI).startsWith("✅ Entregado: " + p.codigo));
+// Caso real (#6052): la tienda le dio "Marcar entregado" en el panel antes de que llegara la foto del domiciliario.
+const tercero = { ...otro, id: "pdomi00000003", no: 2052, codigo: undefined };
+await store.guardarPedido(tercero);
+await llamar({ id: tercero.id, cambios: { status: "en_camino" } });
+await llamar({ id: tercero.id, cambios: { status: "entregado" } });
+const t3 = await store.leerPedido(tercero.id);
+await escribe(DOMI, "image", t3.codigo);
+const t3b = await store.leerPedido(tercero.id);
+ok("ya marcado entregado por la tienda: la foto queda en el pedido y se le dice al domiciliario", /ya lo había marcado entregado/.test(ultimoA(DOMI)) && t3b.status === "entregado" && t3b.fotoEntrega?.startsWith("data:image/jpeg") && t3b.entregadoPor === "Juan Pablo");
+await escribe(DOMI, "image", t3.codigo);
+ok("si ya tiene foto, se le dice que ya aparece entregado", /ya aparece entregado/.test(ultimoA(DOMI)));
 ok("al cliente le llega el aviso de entregado", /entregado/i.test(ultimoA(CLIENTE)));
 
 // El primer pedido: le llega cuando despacha de nuevo? No: ya estaba en camino. Entrega con foto y código en el mismo mensaje.
