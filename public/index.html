@@ -2285,9 +2285,25 @@ function pintarChats() {
     return item;
   }));
 }
+// Suena cuando un cliente escribe en un chat que necesita a una persona: la tienda lo tomó (ahí el asistente no
+// responde) o el asistente está apagado. No suena por lo que responde el asistente ni por los domiciliarios (a
+// ellos los atiende el sistema). La primera carga no suena.
+let chatsVistos = null;
+const digitosDe = s => String(s || '').replace(/\D/g, '');
+function esDomiciliario(f) {
+  return (typeof DOMIS !== 'undefined' ? DOMIS : []).some(d => { const t = String(d.telefono || '').trim();
+    return t.startsWith('@') ? t.slice(1).toLowerCase() === String(f.usuario || '').toLowerCase() : digitosDe(t).length >= 7 && digitosDe(f.id).endsWith(digitosDe(t).slice(-10)); });
+}
+function avisarChats(chats) {
+  const b = $('wa-interruptor'), apagado = !b.hidden && b.getAttribute('aria-pressed') !== 'true';
+  const antes = chatsVistos;
+  chatsVistos = new Map(chats.map(f => [f.id, f.ultimoCliente || 0]));
+  if (antes && chats.some(f => (f.ultimoCliente || 0) > (antes.get(f.id) || 0) && f.ultimoDir === 'in' && (f.pausa > 0 || apagado) && deEstaLinea(f) && !esDomiciliario(f))) sonar();
+}
 function cargarChats() {
   return pedir(urlConv('chats')).then(d => {
     CONV.chats = d.chats || []; CONV.ventana = d.ventana || CONV.ventana; CONV.linea = d.linea || '';
+    avisarChats(CONV.chats);
     const firma = JSON.stringify(CONV.chats) + '|' + CONV.abierto + '|' + CONV.filtro;
     if (firma !== CONV.firmaLista) { CONV.firmaLista = firma; pintarChats(); }
     if (!CONV.abierto && !$('wa-chat').childElementCount) pintarBienvenida();
@@ -2613,9 +2629,11 @@ async function enviarMensaje() {
 }
 // Se refresca solo: la lista cada ~10 s en cualquier sección (para el contador) y el chat abierto cada 3,5 s.
 setInterval(() => {
-  if (vistaActual !== 'panel' || !panelAbierto || document.visibilityState !== 'visible') return;
-  const enConv = !$('pest-conversaciones').hidden;
+  if (vistaActual !== 'panel' || !panelAbierto) return;
   CONV.tick++;
+  // En segundo plano solo la lista, cada ~21 s: para que suene si un cliente escribe en un chat que atiende la tienda.
+  if (document.visibilityState !== 'visible') { if (CONV.tick % 6 === 0) cargarChats(); return; }
+  const enConv = !$('pest-conversaciones').hidden;
   if (enConv || CONV.tick % 3 === 0) cargarChats();
   if (enConv && CONV.abierto) cargarChat();
 }, 3500);
