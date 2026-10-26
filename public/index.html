@@ -328,6 +328,9 @@ input { font: inherit; color: inherit; }
 .total { display: flex; justify-content: space-between; font-weight: 700; }
 .comprobante { display: flex; gap: 0.7rem; align-items: center; background: var(--lila-claro); border-radius: 12px; padding: 0.5rem; font-size: 0.9rem; }
 .comprobante img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; }
+/* Lo que el cliente agregó a un pedido ya cerrado: que salte a la vista al alistar. */
+.agregado { display: grid; gap: 0.2rem; background: var(--sol); border-radius: 12px; padding: 0.5rem 0.7rem; font-size: 0.88rem; color: var(--tinta); }
+.agregado small { opacity: 0.85; }
 .chip { display: inline-block; padding: 0.1rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
 .chip--ok { background: var(--ok-bg); color: var(--ok); } .chip--mal { background: var(--mal-bg); color: var(--mal); }
 .acciones { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
@@ -1887,7 +1890,7 @@ const horaProgramada = o => (o.programado && Number(o.programado.ts)) || 0;
 const turnoDe = o => horaProgramada(o) ? horaProgramada(o) - ANTES_DE_ENTREGAR : o.hora;
 const yaToca = o => !!horaProgramada(o) && o.status === 'alistando' && Date.now() >= horaProgramada(o) - ANTES_DE_ENTREGAR;
 const duracion = ms => { const min = Math.max(1, Math.round(Math.abs(ms) / 60000)); return min < 60 ? min + ' min' : Math.floor(min / 60) + ' h' + (min % 60 ? ' ' + (min % 60) + ' min' : ''); };
-let firmaTablero = '', tarjetasVistas = new Set();
+let firmaTablero = '', tarjetasVistas = new Set(), agregadosVistos = new Map();
 // Pedidos con el formulario de cancelación abierto, y los motivos (los mismos que acepta el servidor).
 const cancelando = new Set(), MOTIVOS_CANCELACION = ['El cliente canceló', 'No se encontró la dirección', 'No había producto', 'Otro', 'Pedido de prueba'];
 // Fecha y hora del pedido: "Hoy 1:36 p. m.", "Ayer 6:40 p. m." o "mar 21 oct · 11:22 a. m.".
@@ -1948,6 +1951,13 @@ function tarjeta(o) {
     el.append(h('p', { class: 'programado' }, h('span', { class: 'chip ' + (yaToca(o) ? 'chip--mal' : 'chip--espera') }, 'Programado: ' + cuando), h('b', null, aviso)));
   } else if (o.encargo) el.append(h('p', null, h('span', { class: 'chip chip--mal' }, String(o.encargo))));
   const picking = o.status === 'alistando', set = picked.get(o.id) || new Set();
+  // Lo que el cliente agregó después de cerrar: si ya estaba marcado como alistado, se desmarca para alistarlo.
+  const agregados = Array.isArray(o.agregados) ? o.agregados : [], vistos = agregadosVistos.get(o.id);
+  if (vistos !== undefined && agregados.length > vistos) for (const a of agregados.slice(vistos)) for (const i of a.items || []) set.delete(i.sku);
+  agregadosVistos.set(o.id, agregados.length);
+  if (agregados.length && ['esperando_pago', 'por_confirmar', 'alistando'].includes(o.status)) el.append(h('div', { class: 'agregado' },
+    h('b', null, '➕ El cliente agregó después de cerrar'),
+    ...agregados.map(a => h('small', null, new Date(a.en).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) + ' · ' + (a.items || []).map(i => i.qty + ' × ' + i.name).join(', ') + ' · ' + pesos(a.valor || 0)))));
   el.append(h('ul', null, ...items.map((i, k) => { const p = BY_SKU.get(i.sku);
     const txt = h('span', null, i.qty + ' × ' + i.name, h('small', null, (p ? p.type + ' · ' : '') + (p ? p.codigo : i.sku)));
     if (!picking) return h('li', null, txt);
@@ -1959,10 +1969,27 @@ function tarjeta(o) {
   el.append(h('div', { class: 'total' }, h('span', null, 'Total · ' + String(o.pago || '')), h('span', { class: 'num' }, pesos(o.total || 0))));
   // Contraentrega: el domiciliario cobra al entregar y lleva la devuelta lista.
   if (o.pago === 'Contraentrega') el.append(h('div', { class: 'comprobante' }, h('div', null, h('div', null, 'Cobrar ', h('b', { class: 'num' }, pesos(o.total || 0)), ' al entregar'),
-    h('div', null, 'Paga con ', h('b', { class: 'num' }, pesos(o.pagaCon || 0)), ' · llevar devuelta de ', h('b', { class: 'num' }, pesos(Math.max(0, (o.pagaCon || 0) - (o.total || 0))))))));
+    o.pagaConPorConfirmar ? h('div', null, h('span', { class: 'chip chip--mal' }, 'Con cuánto paga: el asistente le está preguntando'))
+      : h('div', null, 'Paga con ', h('b', { class: 'num' }, pesos(o.pagaCon || 0)), ' · llevar devuelta de ', h('b', { class: 'num' }, pesos(Math.max(0, (o.pagaCon || 0) - (o.total || 0))))))));
+  // Pagó por transferencia y después agregó: la diferencia la paga como eligió el cliente.
+  const dif = o.diferencia && o.diferencia.valor > 0 && o.pago === 'Transferencia' ? o.diferencia : null;
+  if (dif && !['entregado', 'cancelado'].includes(o.status)) {
+    const estado = dif.estado === 'confirmada' ? 'Transferencia confirmada' + (dif.confirmadaPor ? ' por ' + dif.confirmadaPor : '')
+      : dif.pago === 'Efectivo' ? (dif.pagaCon ? 'En efectivo al entregar · paga con ' + pesos(dif.pagaCon) + ' · devuelta ' + pesos(dif.pagaCon - dif.valor) : 'En efectivo al entregar · preguntándole con cuánto paga')
+      : dif.estado === 'por_confirmar' ? 'Mandó el comprobante por ' + pesos(dif.monto || 0) + ': está en el chat de Conversaciones'
+      : dif.pago === 'Transferencia' ? 'Por transferencia · esperando el comprobante' : 'El asistente le está preguntando cómo la paga';
+    const caja = h('div', { class: 'comprobante' }, h('div', null, h('div', null, 'Diferencia por lo agregado: ', h('b', { class: 'num' }, pesos(dif.valor))),
+      h('span', { class: 'chip ' + (dif.estado === 'confirmada' || dif.pago === 'Efectivo' ? 'chip--ok' : 'chip--mal') }, estado)));
+    if (dif.pago === 'Transferencia' && dif.estado !== 'confirmada') {
+      const b = h('button', { class: 'mini', type: 'button' }, dif.estado === 'por_confirmar' ? 'Confirmar diferencia' : 'Confirmar sin comprobante');
+      caja.append(dosPasos(b, '¿Llegaron los ' + pesos(dif.valor) + '?', () => act(o, { diferenciaConfirmada: true })));
+    }
+    el.append(caja);
+  }
   const acts = h('div', { class: 'acciones' });
   if (o.status === 'por_confirmar') {
-    const covers = (o.proofMonto || 0) >= (o.total || 0);
+    // El comprobante cubre lo que costaba al mandarlo; lo agregado después va aparte (la diferencia).
+    const covers = (o.proofMonto || 0) >= (o.total || 0) - (dif ? dif.valor : 0);
     el.append(h('div', { class: 'comprobante' }, o.proof && String(o.proof).startsWith('data:image/') ? verComprobante(o) : null,
       h('div', null, h('div', null, 'El asistente leyó ', h('b', { class: 'num' }, pesos(o.proofMonto || 0))), h('span', { class: 'chip ' + (covers ? 'chip--ok' : 'chip--mal') }, covers ? 'Cubre el total' : 'No cubre el total'))));
     const yes = h('button', { class: 'btn btn--morado', type: 'button' }, 'Confirmar pago'), no = h('button', { class: 'btn btn--peligro', type: 'button' }, 'Rechazar');
@@ -2043,6 +2070,9 @@ function sonar() {
 }
 function avisarNuevos(lista) {
   const llaves = lista.filter(o => POR_ATENDER.includes(o.status)).map(o => o.id + ':' + o.status);
+  // También suena cuando el cliente le agrega algo a un pedido que ya estaba en la tienda.
+  for (const o of lista) if (POR_ATENDER.includes(o.status) && (o.agregados || []).length) llaves.push(o.id + ':agregado' + o.agregados.length);
+  for (const o of lista) if (o.diferencia && o.diferencia.estado === 'por_confirmar') llaves.push(o.id + ':diferencia');
   // También suena cuando a un pedido programado le llega la hora de despacharse.
   for (const o of lista) if (yaToca(o)) llaves.push(o.id + ':toca');
   // La primera carga no suena: son pedidos que ya estaban.
@@ -2965,7 +2995,7 @@ fetch('catalog.json').then(r => r.json()).then(d => {
   const vista = location.hash.slice(1); if (vista === 'panel' || vista === 'carta') verVista(vista);
 }).catch(() => { $('cat-accesos').replaceChildren(h('p', null, 'No se pudo cargar el catálogo. Recarga la página.')); });
 storeReady.then(s => { store = s; s.all(list => {
-    const firma = JSON.stringify(list.map(o => [o.id, o.status, o.total, o.proofMonto, o.rechazo, o.encargo, (o.items || []).length, o.codigo, o.avisoDomiciliario, o.efectivoPorEntregar, !!o.fotoEntrega])) + (list.some(o => o.programado) ? Math.floor(Date.now() / 60000) : '');
+    const firma = JSON.stringify(list.map(o => [o.id, o.status, o.total, o.proofMonto, o.rechazo, o.encargo, (o.items || []).length, o.codigo, o.avisoDomiciliario, o.efectivoPorEntregar, !!o.fotoEntrega, (o.agregados || []).length, o.pagaConPorConfirmar, o.pagaCon, JSON.stringify(o.diferencia || null)])) + (list.some(o => o.programado) ? Math.floor(Date.now() / 60000) : '');
     panelOrders = list; avisarNuevos(list);
     if (firma !== firmaTablero) { firmaTablero = firma; renderPanel(); }
   });

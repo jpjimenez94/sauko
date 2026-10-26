@@ -1,7 +1,8 @@
 import { CATALOGO, METODOS_PAGO, totales, horario, cargarNegocio, revisarProgramado, momentoDe, cantidadValida } from "../lib/comun.js";
 import { exigirSesion } from "../lib/usuarios.js";
 import { listarPedidos, leerPedido, guardarPedido, borrarPedido, reponer, anotar, listarArchivados, restaurarPedido, listarVentas, fotosDePedido } from "../lib/store.js";
-import { avisoDeTienda } from "../lib/conversacion.js";
+import { avisoDeTienda, avisoDiferencia } from "../lib/conversacion.js";
+import { cobroEnEfectivo } from "../lib/tienda.js";
 import { enviarTexto } from "../lib/whatsapp.js";
 import { avisarEntrega } from "../lib/opiniones.js";
 import { asignarYAvisar } from "../lib/domiciliarios.js";
@@ -121,6 +122,16 @@ export default async function handler(req, res) {
         await guardarPedido(pedido);
         return res.status(200).json({ ok: true });
       }
+      // Lo que el cliente agregó a un pedido ya pagado: la tienda confirma que llegó la transferencia de la diferencia.
+      if (pedido && req.body?.cambios?.diferenciaConfirmada === true) {
+        if (!pedido.diferencia || pedido.diferencia.pago !== "Transferencia") return res.status(400).json({ error: "Ese pedido no tiene una diferencia por transferencia." });
+        Object.assign(pedido.diferencia, { estado: "confirmada", confirmadaPor: yo.nombre || yo.usuario, confirmadaEn: Date.now() });
+        await guardarPedido(pedido);
+        await anotar(`${yo.nombre || yo.usuario} confirmó la diferencia del pedido #${pedido.no}`, `$${pedido.diferencia.valor}`).catch(() => {});
+        const aviso = await avisoDiferencia(pedido);
+        if (aviso) await enviarTexto(pedido.cliente, aviso);
+        return res.status(200).json({ ok: true });
+      }
       const estado = req.body?.cambios?.status;
       if (!pedido || !DEL_PANEL.includes(estado)) return res.status(400).json({ error: "Cambio no válido" });
       // Cancelar solo aplica a pedidos que ya están en la tienda (alistando o en camino); uno ya entregado
@@ -134,7 +145,7 @@ export default async function handler(req, res) {
         if (!pedido.codigo) pedido.codigo = String(1000 + Math.floor(Math.random() * 9000));
         await asignarYAvisar(pedido, String(req.body?.cambios?.domiciliario ?? ""));
       }
-      if (estado === "entregado") Object.assign(pedido, { entregadoEn: Date.now(), efectivoPorEntregar: pedido.pago === "Contraentrega" ? pedido.total : 0 });
+      if (estado === "entregado") Object.assign(pedido, { entregadoEn: Date.now(), efectivoPorEntregar: cobroEnEfectivo(pedido).valor });
       if (estado === "cancelado") {
         const motivo = MOTIVOS.includes(req.body?.cambios?.motivo) ? req.body.cambios.motivo : "Otro";
         // Las unidades vuelven una sola vez, y solo si salieron y la tienda no las marcó como perdidas.
