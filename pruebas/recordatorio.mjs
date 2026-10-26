@@ -14,8 +14,9 @@ const { enviarRecordatorios } = await import(raiz + "lib/recordatorios.js");
 const webhook = (await import(raiz + "api/whatsapp.js")).default;
 const ok = (t, c) => console.log((c ? "OK    " : "FALLA ") + t);
 
-// 10:00 a. m. en Cali: hay domicilios.
-const AHORA = Date.parse("2026-10-23T10:00:00-05:00");
+// 10:00 a. m. de hoy en Cali: hay domicilios (hoy: el panel solo lista los pedidos de los últimos tres días).
+const HOY = new Date(Date.now() - 5 * 3600000).toISOString().slice(0, 10);
+const AHORA = Date.parse(`${HOY}T10:00:00-05:00`);
 await store.guardarAjustes({ whatsappActivo: true });
 const pedido = (id, cliente) => ({ id, no: 100 + enviados.length, canal: "WhatsApp", cliente, status: "armando", items: [{ sku: "x", name: "Limón (libra)", price: 4000, qty: 0.5 }], total: 0, hora: AHORA - 30 * 60000 });
 const conversacion = (cliente, id, hace, ultimoRol = "assistant") => store.guardarCharla(cliente, { turnos: [{ role: "user", content: "½ libra de limón" }, { role: ultimoRol, content: "Anotado." }], pedidoId: id, ultimo: AHORA - hace });
@@ -34,7 +35,7 @@ ok("una sola vez por pedido", enviados.filter((m) => m.to === "573001110001").le
 ok("queda en la conversación para que el asistente sepa qué preguntó", /cerramos tu pedido/.test((await store.leerCharla("573001110001")).turnos.at(-1).content));
 
 await store.guardarPedido(pedido("pr5", "573001110005")); await conversacion("573001110005", "pr5", 25 * 60000);
-r = await enviarRecordatorios(Date.parse("2026-10-23T23:30:00-05:00") );
+r = await enviarRecordatorios(Date.parse(`${HOY}T23:30:00-05:00`) );
 ok("fuera del horario de domicilios no se le escribe", r.enviados === 0);
 
 // El enlace para una tarea programada, con clave.
