@@ -443,6 +443,8 @@ input { font: inherit; color: inherit; }
 .periodos button[aria-pressed="true"] { background: var(--morado-oscuro); color: #fff; }
 .wa-filtros button { font-size: 0.8rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: #fff; }
 .wa-filtros button[aria-pressed="true"] { background: var(--sol); color: var(--tinta); }
+.wa-avisos { justify-self: start; border: 0; font: inherit; font-size: 0.8rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 999px; background: var(--sol); color: var(--tinta); cursor: pointer; }
+.wa-avisos[aria-pressed="false"] { background: rgba(255, 255, 255, 0.14); color: #fff; }
 .wa-chats { overflow-y: auto; flex: 1; min-height: 0; }
 .wa-chat-item { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; width: 100%; padding: 0.7rem 1rem; text-align: left; border-bottom: 1px solid #f0f2f5; transition: background 0.12s; }
 .wa-chat-item:hover { background: #f5f6f6; }
@@ -937,6 +939,7 @@ input { font: inherit; color: inherit; }
               <button type="button" data-filtro="tienda" aria-pressed="false">Atiende la tienda</button>
               <button type="button" data-filtro="linea" aria-pressed="false">Línea actual</button>
             </div>
+            <button type="button" class="wa-avisos" id="wa-avisos" aria-pressed="true">🔔 Sonido de chats: prendido</button>
           </div>
           <div class="wa-chats" id="wa-chats" role="list" data-lenis-prevent></div>
         </aside>
@@ -2285,20 +2288,38 @@ function pintarChats() {
     return item;
   }));
 }
-// Suena cuando un cliente escribe en un chat que necesita a una persona: la tienda lo tomó (ahí el asistente no
-// responde) o el asistente está apagado. No suena por lo que responde el asistente ni por los domiciliarios (a
-// ellos los atiende el sistema). La primera carga no suena.
-let chatsVistos = null;
+// Suena (con un tono distinto al de los pedidos) cada vez que un cliente escribe, lo atienda el asistente o la
+// tienda. No suena por los domiciliarios (a ellos los atiende el sistema) ni por el chat que ya está abierto a la
+// vista. Se apaga o se prende con el botón "Sonido de chats"; queda guardado en ese dispositivo.
+let chatsVistos = null, sonidoChats = true;
+try { sonidoChats = localStorage.getItem('sauko-sonido-chats') !== 'no'; } catch (e) {}
+function pintarSonidoChats() { const b = $('wa-avisos'); b.setAttribute('aria-pressed', String(sonidoChats)); b.textContent = sonidoChats ? '🔔 Sonido de chats: prendido' : '🔕 Sonido de chats: apagado'; }
+pintarSonidoChats();
+$('wa-avisos').addEventListener('click', () => {
+  sonidoChats = !sonidoChats;
+  try { localStorage.setItem('sauko-sonido-chats', sonidoChats ? 'si' : 'no'); } catch (e) {}
+  pintarSonidoChats();
+  if (sonidoChats) { activarSonido(); sonarChat(); }
+});
+function sonarChat() {
+  try {
+    contextoDeSonido();
+    if (audio.state !== 'running') audio.resume();
+    [[0, 660], [0.16, 990]].forEach(([cuando, tono]) => { const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + cuando;
+      o.frequency.value = tono; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+      o.connect(g).connect(audio.destination); o.start(t); o.stop(t + 0.16); });
+  } catch (e) {}
+}
 const digitosDe = s => String(s || '').replace(/\D/g, '');
 function esDomiciliario(f) {
   return (typeof DOMIS !== 'undefined' ? DOMIS : []).some(d => { const t = String(d.telefono || '').trim();
     return t.startsWith('@') ? t.slice(1).toLowerCase() === String(f.usuario || '').toLowerCase() : digitosDe(t).length >= 7 && digitosDe(f.id).endsWith(digitosDe(t).slice(-10)); });
 }
 function avisarChats(chats) {
-  const b = $('wa-interruptor'), apagado = !b.hidden && b.getAttribute('aria-pressed') !== 'true';
   const antes = chatsVistos;
   chatsVistos = new Map(chats.map(f => [f.id, f.ultimoCliente || 0]));
-  if (antes && chats.some(f => (f.ultimoCliente || 0) > (antes.get(f.id) || 0) && f.ultimoDir === 'in' && (f.pausa > 0 || apagado) && deEstaLinea(f) && !esDomiciliario(f))) sonar();
+  const aLaVista = id => id === CONV.abierto && !$('pest-conversaciones').hidden && document.visibilityState === 'visible';
+  if (sonidoChats && antes && chats.some(f => (f.ultimoCliente || 0) > (antes.get(f.id) || 0) && f.ultimoDir === 'in' && deEstaLinea(f) && !esDomiciliario(f) && !aLaVista(f.id))) sonarChat();
 }
 function cargarChats() {
   return pedir(urlConv('chats')).then(d => {
@@ -2631,7 +2652,7 @@ async function enviarMensaje() {
 setInterval(() => {
   if (vistaActual !== 'panel' || !panelAbierto) return;
   CONV.tick++;
-  // En segundo plano solo la lista, cada ~21 s: para que suene si un cliente escribe en un chat que atiende la tienda.
+  // En segundo plano solo la lista, cada ~21 s: para que suene si un cliente escribe.
   if (document.visibilityState !== 'visible') { if (CONV.tick % 6 === 0) cargarChats(); return; }
   const enConv = !$('pest-conversaciones').hidden;
   if (enConv || CONV.tick % 3 === 0) cargarChats();
