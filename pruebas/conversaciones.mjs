@@ -131,3 +131,30 @@ ok("cuando escribe a la línea nueva, el mensaje guarda la línea y el número",
 await panel("POST", "tomar", { body: { c: OTRA_LINEA, horas: 1 } });
 [c] = await panel("POST", "enviar", { body: { c: OTRA_LINEA, texto: "hola veci, ¿qué necesitas?" } });
 ok("y ya se le puede contestar a mano", c === 200);
+
+// 9. Falla de WhatsApp (sin método de pago): lo que no le llegó al cliente se le responde de nuevo desde el panel.
+const SIN = "573004445566";
+await aviso({ contacts: [{ wa_id: SIN, profile: { name: "Pedro Sin Respuesta" } }], messages: [{ id: "wamid.sin1", from: SIN, timestamp: String(Math.floor(Date.now() / 1000)), type: "text", text: { body: "una pony personal" } }] });
+[, d] = await panel("GET", "chat", { query: { c: SIN } });
+const idFallido = d.mensajes.find((m) => m.dir === "out").id;
+await aviso({ statuses: [{ id: idFallido, recipient_id: SIN, status: "failed", errors: [{ code: 131042, title: "Business eligibility payment issue" }] }] });
+[, d] = await panel("GET", "sin-entregar");
+ok("sin entregar: aparece el cliente al que no le llegó la respuesta", d.pendientes.some((p) => p.id === SIN && p.nombre === "Pedro Sin Respuesta" && p.mensajes === 1));
+const antesReintento = enviados.length;
+[c] = await panel("POST", "reintentar", { body: { c: SIN } });
+const nuevo = enviados.slice(antesReintento).find((b) => b.to === SIN);
+ok("responder de nuevo: el asistente le vuelve a escribir", c === 200 && Boolean(nuevo));
+[, d] = await panel("GET", "sin-entregar");
+ok("y ya no sale como pendiente", !d.pendientes.some((p) => p.id === SIN));
+[c] = await panel("POST", "reintentar", { body: { c: SIN } });
+ok("un segundo toque no le manda otra respuesta", c === 409);
+// Si la tienda le escribió a mano y le llegó, tampoco sale.
+const MANO = "573004447788";
+await aviso({ contacts: [{ wa_id: MANO, profile: { name: "Lucía" } }], messages: [{ id: "wamid.mano1", from: MANO, timestamp: String(Math.floor(Date.now() / 1000)), type: "text", text: { body: "hola" } }] });
+[, d] = await panel("GET", "chat", { query: { c: MANO } });
+await aviso({ statuses: [{ id: d.mensajes.find((m) => m.dir === "out").id, recipient_id: MANO, status: "failed", errors: [{ code: 131042, title: "Business eligibility payment issue" }] }] });
+await panel("POST", "enviar", { body: { c: MANO, texto: "Veci, disculpá la demora" } });
+[, d] = await panel("GET", "chat", { query: { c: MANO } });
+await aviso({ statuses: [{ id: d.mensajes.at(-1).id, recipient_id: MANO, status: "delivered" }] });
+[, d] = await panel("GET", "sin-entregar");
+ok("si la tienda ya le escribió y le llegó, no sale como pendiente", !d.pendientes.some((p) => p.id === MANO));
