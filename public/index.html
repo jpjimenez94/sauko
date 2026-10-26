@@ -282,6 +282,7 @@ input { font: inherit; color: inherit; }
 .barra { background: var(--morado-oscuro); color: var(--crema); padding: calc(env(safe-area-inset-top, 0px) + 0.9rem) clamp(1rem, 4vw, 2rem) 0.9rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; position: sticky; top: 0; z-index: 2; }
 .barra h1 { font-family: var(--display); font-weight: 800; font-size: 1.3rem; flex: 1; line-height: 1; }
 .vivo { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; }
+.sonido { border: 0; border-radius: 999px; padding: 0.35rem 0.8rem; font: inherit; font-size: 0.85rem; font-weight: 700; background: var(--sol); color: var(--tinta); cursor: pointer; animation: late 1.4s infinite; }
 .vivo i { width: 9px; height: 9px; border-radius: 50%; background: #4ade80; animation: late 1.4s infinite; }
 @keyframes late { 50% { opacity: 0.3; } }
 .panel main { padding: clamp(1rem, 4vw, 2rem); max-width: 1280px; margin: 0 auto; display: grid; gap: 1.5rem; }
@@ -849,6 +850,7 @@ input { font: inherit; color: inherit; }
     <h1>Panel de la tienda</h1>
     <span class="seccion-actual" id="seccion-actual">Pedidos</span>
     <span class="vivo"><i></i><span id="vivo-texto">En vivo</span></span>
+    <button class="sonido" id="sonido" type="button" hidden>🔇 Tocá aquí para activar el sonido</button>
     <button class="interruptor" id="wa-interruptor" type="button" aria-pressed="false" hidden>WhatsApp: apagado</button>
     <button class="btn btn--sol volver-pagina" type="button" data-vista="tienda">Volver a la página</button>
   </header>
@@ -2060,9 +2062,36 @@ function agrupar(lista, clave, valor) { const m = new Map(); for (const x of lis
 // Aviso de pedido nuevo: suena y cambia el título de la pestaña cuando entra algo por atender.
 const POR_ATENDER = ['por_confirmar', 'alistando'];
 let yaAvisados = null, audio = null;
+// iPad y iPhone (Safari) no dejan que una página suene hasta que alguien la toca: el sonido se activa con el
+// primer toque y, si no se ha activado, el panel muestra un botón para hacerlo. En el iPhone se pide sonar como
+// reproducción (Safari 17+) para que el interruptor de silencio no calle el aviso.
+function contextoDeSonido() {
+  if (!audio) { try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {} audio = new (window.AudioContext || window.webkitAudioContext)(); }
+  return audio;
+}
+function activarSonido() {
+  try {
+    const a = contextoDeSonido();
+    if (a.state !== 'running') a.resume();
+    const s = a.createBufferSource(); s.buffer = a.createBuffer(1, 1, 22050); s.connect(a.destination); s.start(0);
+  } catch (e) {}
+  setTimeout(pintarSonido, 300);
+  pantallaEncendida();
+}
+function pintarSonido() { const b = $('sonido'); if (b) b.hidden = !panelAbierto || Boolean(audio && audio.state === 'running'); }
+['pointerdown', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if (!audio || audio.state !== 'running') activarSonido(); }, { capture: true, passive: true }));
+$('sonido').addEventListener('click', () => { activarSonido(); sonar(); });
+// Con el panel abierto la pantalla no se apaga (si se bloquea, la tablet deja de consultar y no avisa).
+let pantalla = null;
+async function pantallaEncendida() {
+  if (!('wakeLock' in navigator) || pantalla || !panelAbierto || document.visibilityState !== 'visible') return;
+  try { pantalla = await navigator.wakeLock.request('screen'); pantalla.addEventListener('release', () => { pantalla = null; }); } catch (e) {}
+}
+document.addEventListener('visibilitychange', pantallaEncendida);
 function sonar() {
   try {
-    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    contextoDeSonido();
+    if (audio.state !== 'running') audio.resume();
     [0, 0.22, 0.44].forEach((cuando, i) => { const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + cuando;
       o.frequency.value = i === 2 ? 1175 : 880; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
       o.connect(g).connect(audio.destination); o.start(t); o.stop(t + 0.2); });
@@ -2078,6 +2107,8 @@ function avisarNuevos(lista) {
   // La primera carga no suena: son pedidos que ya estaban.
   if (yaAvisados && llaves.some(k => !yaAvisados.has(k))) sonar();
   yaAvisados = new Set(llaves);
+  pintarSonido();
+  pantallaEncendida();
   const pendientes = lista.filter(o => o.status === 'por_confirmar').length + lista.filter(o => o.status === 'alistando').length;
   document.title = (pendientes ? '(' + pendientes + ') ' : '') + 'Sauko Store · ' + (vistaActual === 'panel' ? 'Panel' : 'Minimarket a domicilio');
 }
