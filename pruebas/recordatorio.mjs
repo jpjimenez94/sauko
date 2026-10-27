@@ -67,3 +67,10 @@ ok("con 0: apagado, no se le recuerda", enviados.length === antes6);
 await store.guardarAjustes({ ...(await store.leerAjustes()), negocio: { recordarMinutos: 30 } }); await cargarNegocio(true);
 await enviarRecordatorios(AHORA);
 ok("con 30 y una hora sin escribir: sí", enviados.length === antes6 + 1);
+
+// Si la tienda le escribió a mano después del asistente ("ya sale para allá"), no se le recuerda.
+await store.guardarPedido(pedido("pr7", "573001110007")); await conversacion("573001110007", "pr7", 40 * 60000);
+await store.registrarMensaje("573001110007", { id: "wamid.tienda7", dir: "out", de: "tienda", tipo: "text", texto: "Ya sale para allá", hora: AHORA - 35 * 60000 });
+const antes7 = enviados.length;
+await enviarRecordatorios(AHORA);
+ok("la tienda ya le escribió a mano: no se le recuerda", !enviados.slice(antes7).some((m) => m.to === "573001110007"));
