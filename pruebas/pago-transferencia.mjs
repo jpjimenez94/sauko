@@ -57,3 +57,17 @@ guion.push(herramienta("guardar_pedido", { items, direccion: "Torre 2 apto 202",
 await atenderWhatsApp(CL3, "dame lo mismo en efectivo con 50000");
 const segundo = await store.leerPedido((await store.leerCharla(CL3)).pedidoId);
 ok("pedido nuevo después de uno cancelado (el cancelado sigue cancelado)", segundo.id !== primero.id && segundo.status === "alistando" && (await store.leerPedido(primero.id)).status === "cancelado");
+
+// Billetes de Colombia: no se acepta "un billete de 1.000.000" ni valores que no se pueden pagar en efectivo.
+const { revisarEfectivo } = await import(raiz + "lib/tienda.js");
+ok("con $100.000 para $23.500 está bien", revisarEfectivo(100000, 23500) === null);
+ok("con $95.000 (varios billetes) para $23.500 está bien", revisarEfectivo(95000, 23500) === null);
+ok("con $1.000.000 para $23.500 no se acepta", /devuelta/.test(revisarEfectivo(1000000, 23500) ?? ""));
+ok("con $200.000 para $50.000 no se acepta (sobra un billete)", revisarEfectivo(200000, 50000) !== null);
+ok("con $95.030 no se acepta (no hay monedas de $30)", /billetes son/.test(revisarEfectivo(95030, 23500) ?? ""));
+ok("con $20.000 para $23.500 no alcanza", /no alcanza/.test(revisarEfectivo(20000, 23500) ?? ""));
+const CL4 = "573009990000";
+guion.push(herramienta("guardar_pedido", { items, direccion: "Torre 6 apto 606", metodo_pago: "Contraentrega" }), herramienta("cerrar_pedido", { paga_con: 1000000 }), texto("¿Con un billete de $100.000, veci?"));
+await atenderWhatsApp(CL4, "efectivo, pago con 1000000");
+const p4 = await store.leerPedido((await store.leerCharla(CL4)).pedidoId);
+ok("cerrar con 'un billete de 1.000.000' no manda el pedido a la tienda", p4.status === "armando" && !p4.pagaCon);
