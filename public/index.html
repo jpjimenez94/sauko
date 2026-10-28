@@ -582,6 +582,18 @@ input { font: inherit; color: inherit; }
 .wa-cerrada { display: flex; gap: 0.6rem; align-items: center; background: #fff6d6; color: #5c4a00; border-radius: 12px; padding: 0.6rem 0.8rem; font-size: 0.86rem; }
 .wa-ventana { font-size: 0.74rem; color: var(--wa-gris); display: flex; justify-content: space-between; gap: 0.6rem; padding: 0 0.3rem; }
 .wa-error { font-size: 0.82rem; color: var(--mal); padding: 0 0.3rem; }
+/* Fruver pedido por unidades: alguien de la tienda lo pesa */
+.wa-porpesar { background: #fff4d1; color: var(--tinta); padding: 0.7rem 0.9rem; display: grid; gap: 0.4rem; font-size: 0.85rem; border-bottom: 1px solid #f1d98a; }
+.wa-porpesar strong { font-size: 0.9rem; }
+.wa-porpesar ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
+.wa-porpesar li button { all: unset; cursor: pointer; display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: underline; text-underline-offset: 2px; }
+.wa-pesar { display: grid; gap: 0.5rem; background: #fff4d1; color: var(--tinta); border: 1px solid #f1d98a; border-radius: 12px; padding: 0.6rem 0.8rem; font-size: 0.86rem; }
+.wa-pesar__fila { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.wa-pesar__fila > span { flex: 1 1 12rem; min-width: 0; }
+.wa-pesar__fila input { width: 6.5rem; padding: 0.35rem 0.5rem; border-radius: 10px; border: 1px solid #d9c27a; font: inherit; background: #fff; color: var(--tinta); }
+.wa-pesar__fila button { font-size: 0.8rem; font-weight: 700; padding: 0.35rem 0.8rem; border-radius: 999px; background: var(--tinta); color: #fff; }
+.wa-pesar__fila button:disabled { opacity: 0.6; }
+.wa-etiqueta--pesar { background: #ffe08a; white-space: nowrap; }
 /* Respuestas que no le llegaron al cliente por una falla de WhatsApp */
 .wa-pendientes { background: var(--mal-bg); color: var(--mal); padding: 0.7rem 0.9rem; display: grid; gap: 0.45rem; font-size: 0.85rem; border-bottom: 1px solid #f3c4bf; }
 .wa-pendientes strong { font-size: 0.9rem; }
@@ -955,6 +967,7 @@ input { font: inherit; color: inherit; }
             </div>
             <button type="button" class="wa-avisos" id="wa-avisos" aria-pressed="true">🔔 Sonido de chats: prendido</button>
           </div>
+          <div class="wa-porpesar" id="wa-porpesar" role="region" aria-label="Fruver por pesar" hidden></div>
           <div class="wa-pendientes" id="wa-pendientes" role="region" aria-label="Clientes sin respuesta" hidden></div>
           <div class="wa-chats" id="wa-chats" role="list" data-lenis-prevent></div>
         </aside>
@@ -2296,7 +2309,7 @@ function pintarChats() {
     // Si el chat salió por lo que dice un mensaje, se muestra ese mensaje.
     const hallado = ($('wa-buscar').value || '').trim().length >= 3 && CONV.enMensajes.get(f.id);
     ultimo.append(h('span', null, hallado ? '🔎 ' + hallado.texto : (f.ultimo || '')));
-    const lado = h('span', { class: 'wa-chat-item__lado' }, h('span', null, f.hora ? cuandoCorto(f.hora) : ''), f.noLeidos ? h('b', null, String(f.noLeidos)) : f.pausa > 0 ? h('span', { class: 'wa-etiqueta' }, 'Tienda') : !deEstaLinea(f) ? h('span', { class: 'wa-etiqueta wa-etiqueta--vieja', title: 'El cliente escribió a la línea anterior del asistente' }, 'Línea anterior') : null);
+    const lado = h('span', { class: 'wa-chat-item__lado' }, h('span', null, f.hora ? cuandoCorto(f.hora) : ''), f.porPesar ? h('span', { class: 'wa-etiqueta wa-etiqueta--pesar', title: 'Pidió fruver por unidades: hay que pesarlo' }, '⚖️ Pesar') : null, f.noLeidos ? h('b', null, String(f.noLeidos)) : f.pausa > 0 ? h('span', { class: 'wa-etiqueta' }, 'Tienda') : !deEstaLinea(f) ? h('span', { class: 'wa-etiqueta wa-etiqueta--vieja', title: 'El cliente escribió a la línea anterior del asistente' }, 'Línea anterior') : null);
     const item = h('button', { type: 'button', class: 'wa-chat-item' + (f.noLeidos ? ' wa-chat-item--nuevo' : ''), 'aria-current': String(f.id === CONV.abierto) }, avatarDe(f), h('span', { class: 'wa-chat-item__centro' }, h('span', { class: 'wa-chat-item__nombre' }, nombreDe(f)), ultimo), lado);
     item.setAttribute('role', 'listitem');
     item.onclick = () => abrirChat(f.id);
@@ -2407,11 +2420,51 @@ function pintarPendientes() {
     h('span', null, 'El asistente les responde de nuevo con una disculpa por la demora. Si ya les escribiste a mano y les llegó, no salen aquí.'),
     h('ul', null, ...filas), todos);
 }
+// Fruver que el cliente pidió por unidades ("3 tomates"): alguien de la tienda lo pesa, escribe los gramos y
+// el asistente le cuenta al cliente el peso y el precio. Suena una vez cuando aparece algo nuevo por pesar.
+const plata = n => '$' + Math.round(n).toLocaleString('es-CO');
+let pesarVistos = null;
+function pintarPorPesar() {
+  const caja = $('wa-porpesar'), con = CONV.chats.filter(f => f.porPesar?.length);
+  const claves = new Set(con.flatMap(f => f.porPesar.map(i => f.id + '|' + i.sku + '|' + i.unidades)));
+  if (pesarVistos && [...claves].some(k => !pesarVistos.has(k))) sonar();
+  pesarVistos = claves;
+  caja.hidden = !con.length;
+  if (!con.length) return;
+  caja.replaceChildren(
+    h('strong', null, '⚖️ Hay fruver por pesar'),
+    h('span', null, 'El cliente lo pidió por unidades. Pésalo, escribe los gramos en el chat y el asistente le dice el precio.'),
+    h('ul', null, ...con.map(f => { const b = h('button', { type: 'button' }, nombreDe(f) + ': ' + f.porPesar.map(i => i.unidades + ' ' + i.nombre.replace(/\s*\(libra\)/i, '')).join(', ')); b.onclick = () => abrirChat(f.id); return h('li', null, b); })));
+}
+function pintarPesar() {
+  const ui = CONV.ui, items = CONV.ficha?.porPesar || [];
+  const firma = CONV.abierto + JSON.stringify(items);
+  if (ui.pesar.dataset.firma === firma) return; // no se repinta mientras escriben el peso
+  ui.pesar.dataset.firma = firma;
+  ui.pesar.hidden = !items.length;
+  if (!items.length) return ui.pesar.replaceChildren();
+  ui.pesar.replaceChildren(h('strong', null, '⚖️ Pesar para este cliente'), ...items.map(i => {
+    const campo = h('input', { type: 'number', inputmode: 'numeric', min: '10', max: '20000', step: '1', placeholder: 'Gramos', 'aria-label': 'Gramos de ' + i.nombre });
+    const b = h('button', { type: 'button' }, 'Listo');
+    const enviar = () => {
+      const gramos = Math.round(Number(campo.value));
+      if (!(gramos >= 10)) { ui.error.textContent = 'Escribe cuántos gramos pesó (por ejemplo 680).'; campo.focus(); return; }
+      b.disabled = true; b.textContent = 'Guardando…';
+      pedir(urlConv('pesar'), { method: 'POST', body: JSON.stringify({ c: CONV.abierto, sku: i.sku, gramos }) })
+        .then(d => { ui.error.className = 'wa-error wa-error--ok'; ui.error.textContent = 'Quedó en el pedido: ' + plata(d.valor) + '. El asistente ya se lo dice al cliente.'; setTimeout(() => { if (CONV.ui) { CONV.ui.error.className = 'wa-error'; CONV.ui.error.textContent = ''; } }, 6000); cargarChat(); cargarChats(); })
+        .catch(e => { b.disabled = false; b.textContent = 'Listo'; ui.error.className = 'wa-error'; ui.error.textContent = e.message; });
+    };
+    b.onclick = enviar;
+    campo.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); enviar(); } };
+    return h('div', { class: 'wa-pesar__fila' }, h('span', null, i.unidades + ' × ' + i.nombre + (i.precioLibra ? ' · ' + plata(i.precioLibra) + ' la libra' : '')), campo, b);
+  }));
+}
 function cargarChats() {
   return pedir(urlConv('chats')).then(d => {
     CONV.chats = d.chats || []; CONV.ventana = d.ventana || CONV.ventana; CONV.linea = d.linea || '';
     avisarChats(CONV.chats);
     pintarEnvio(d.envio);
+    pintarPorPesar();
     const firma = JSON.stringify(CONV.chats) + '|' + CONV.abierto + '|' + CONV.filtro;
     if (firma !== CONV.firmaLista) { CONV.firmaLista = firma; pintarChats(); }
     if (!CONV.abierto && !$('wa-chat').childElementCount) pintarBienvenida();
@@ -2468,7 +2521,9 @@ function armarChat() {
   ui.cerrada.hidden = true;
   ui.reintento = h('div', { class: 'wa-reintento', role: 'alert' });
   ui.reintento.hidden = true;
-  $('wa-chat').replaceChildren(cabeza, ui.mensajes, ui.bajar, h('footer', { class: 'wa-escribir' }, ui.extras, ui.reintento, ui.cerrada, ui.fila, ui.ventana, ui.error));
+  ui.pesar = h('div', { class: 'wa-pesar', role: 'region', 'aria-label': 'Fruver por pesar' });
+  ui.pesar.hidden = true;
+  $('wa-chat').replaceChildren(cabeza, ui.mensajes, ui.bajar, h('footer', { class: 'wa-escribir' }, ui.extras, ui.pesar, ui.reintento, ui.cerrada, ui.fila, ui.ventana, ui.error));
   clip.onclick = () => ui.archivo.click();
   ui.archivo.onchange = () => { const f = ui.archivo.files[0]; ui.archivo.value = ''; if (f) prepararFoto(f); };
   cara.onclick = () => { CONV.emojis = !CONV.emojis; pintarExtras(); };
@@ -2529,6 +2584,7 @@ function pintarVentana() {
   const abierta = resta > 0;
   ui.cerrada.hidden = abierta; ui.fila.hidden = !abierta;
   pintarReintento(abierta);
+  pintarPesar();
   ui.cerrada.lastChild.textContent = vieja
     ? 'Este cliente le escribió a la línea anterior del asistente. Desde aquí se responde por la línea nueva, y WhatsApp no deja escribirle hasta que el cliente le escriba a esta.'
     : 'Pasaron más de 24 horas desde el último mensaje del cliente. WhatsApp no deja escribirle libremente hasta que vuelva a escribir.';
